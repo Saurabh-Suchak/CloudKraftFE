@@ -2,10 +2,12 @@
   "name": "cloudkraftfe",
   "version": "1.0.0",
   "scripts": {
+    "dev": "vite",
     "lint": "eslint .",
     "test": "echo \"No tests yet\" && exit 0",
     "build": "vite build"
   },
-  "dependencies": {},
-  "devDependencies": {}
+  "devDependencies": {
+    "vite": "^7.2.6"
+  }
 }
