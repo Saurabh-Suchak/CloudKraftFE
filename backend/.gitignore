@@ -1,0 +1,24 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.venv/
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+
+# Databases
+# *.sqlite3
+# *.sqlite
+# *.db
+
+# OS generated files
+.DS_Store
+
+# IDEs
+.vscode/
+.idea/
