@@ -40,12 +40,75 @@ const observer = new MutationObserver(() => {
   if (document.getElementById('workflowCanvas')) {
     reinitWorkflowDesigner();
   }
+  
+  // Initialize AWS Signup form if it exists in DOM
+  const awsForm = document.getElementById('awsSignupForm');
+  if (awsForm && !awsForm.hasAttribute('data-initialized')) {
+    initAwsSignupForm();
+  }
+});
+
+// Helper function to initialize AWS Signup interactions
+function initAwsSignupForm() {
+  const awsForm = document.getElementById('awsSignupForm');
+  if (!awsForm) return;
+  awsForm.setAttribute('data-initialized', 'true');
+
+  const authRadios = document.querySelectorAll('input[name="authMethod"]');
+  const accessKeySection = document.getElementById('accessKeySection');
+  const assumeRoleSection = document.getElementById('assumeRoleSection');
+  const awsExternalIdInput = document.getElementById('awsExternalId') as HTMLInputElement;
+  const displayExternalId = document.getElementById('displayExternalId');
+
+  // Generate External ID if not already generated
+  if (displayExternalId && awsExternalIdInput && !awsExternalIdInput.value) {
+    const generatedId = crypto.randomUUID();
+    awsExternalIdInput.value = generatedId;
+    displayExternalId.textContent = generatedId;
+  }
+}
+
+// Delegate radio toggle events to the document so they survive DOM re-renders by the router
+document.addEventListener('change', (e) => {
+  const target = e.target as HTMLInputElement;
+  if (target.name === 'authMethod') {
+    const accessKeySection = document.getElementById('accessKeySection');
+    const assumeRoleSection = document.getElementById('assumeRoleSection');
+    
+    if (target.value === 'access_key') {
+      if (accessKeySection) {
+        accessKeySection.style.display = 'block';
+        accessKeySection.classList.add('active');
+      }
+      if (assumeRoleSection) {
+        assumeRoleSection.style.display = 'none';
+        assumeRoleSection.classList.remove('active');
+      }
+    } else if (target.value === 'assume_role') {
+      if (accessKeySection) {
+        accessKeySection.style.display = 'none';
+        accessKeySection.classList.remove('active');
+      }
+      if (assumeRoleSection) {
+        assumeRoleSection.style.display = 'block';
+        assumeRoleSection.classList.add('active');
+      }
+    }
+  }
 });
 
 observer.observe(document.body, {
   childList: true,
   subtree: true
 });
+
+// Check periodically in case the router renders the form asynchronously
+setInterval(() => {
+  const awsForm = document.getElementById('awsSignupForm');
+  if (awsForm && !awsForm.hasAttribute('data-initialized')) {
+    initAwsSignupForm();
+  }
+}, 250);
 
 // Handle password toggle on login and signup pages
 document.addEventListener('click', (e) => {
@@ -97,23 +160,119 @@ document.addEventListener('submit', (e) => {
     router.navigate('/dashboard');
   } else if (form.id === 'awsSignupForm') {
     e.preventDefault();
-    // Validate AWS credentials
-    const accessKey = (form.querySelector('#awsAccessKey') as HTMLInputElement)?.value.trim();
-    const secretKey = (form.querySelector('#awsSecretKey') as HTMLInputElement)?.value.trim();
+    // Validate AWS credentials based on Auth Method
+    const authMethodEl = form.querySelector('input[name="authMethod"]:checked') as HTMLInputElement;
+    const authMethod = authMethodEl ? authMethodEl.value : 'access_key';
+    
+    let accessKey: string | undefined;
+    let secretKey: string | undefined;
+    let roleArn: string | undefined;
+    let externalId: string | undefined;
     const region = (form.querySelector('#awsRegion') as HTMLSelectElement)?.value;
-    
-    if (!accessKey || !secretKey || !region) {
-      alert('Please fill in all AWS credential fields.');
-      return;
+
+    if (authMethod === 'access_key') {
+       accessKey = (form.querySelector('#awsAccessKey') as HTMLInputElement)?.value.trim();
+       secretKey = (form.querySelector('#awsSecretKey') as HTMLInputElement)?.value.trim();
+       
+       if (!accessKey || !secretKey || !region) {
+         alert('Please fill in all AWS Access Key fields.');
+         return;
+       }
+       
+       if (!accessKey.startsWith('AKIA') && accessKey.length < 16) {
+         alert('Please enter a valid AWS Access Key ID.');
+         return;
+       }
+    } else if (authMethod === 'assume_role') {
+       roleArn = (form.querySelector('#awsRoleArn') as HTMLInputElement)?.value.trim();
+       externalId = (form.querySelector('#awsExternalId') as HTMLInputElement)?.value.trim();
+       
+       if (!roleArn || !region) {
+         alert('Please fill in your AWS Role ARN and Region.');
+         return;
+       }
+       
+       if (!roleArn.startsWith('arn:aws:iam::')) {
+         alert('Please enter a valid IAM Role ARN.');
+         return;
+       }
     }
     
-    // Basic validation for AWS Access Key format (starts with AKIA)
-    if (!accessKey.startsWith('AKIA') && accessKey.length < 16) {
-      alert('Please enter a valid AWS Access Key ID.');
-      return;
-    }
+    // Mock API Connection Flow
+    const submitBtn = form.querySelector('button[type="submit"]') as HTMLButtonElement;
+    const originalBtnContent = submitBtn.innerHTML;
     
-    // Navigate to dashboard on successful AWS signup
-    router.navigate('/dashboard');
+    // Set loading state
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `
+      <svg class="aws-icon animate-spin" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="animation: spin 1s linear infinite;">
+        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" stroke-dasharray="31.4 31.4" stroke-linecap="round"/>
+      </svg>
+      Connecting...
+    `;
+    
+    // Call actual FastAPI Backend
+    const payload = {
+      authMethod,
+      accessKey: accessKey || null,
+      secretKey: secretKey || null,
+      roleArn: roleArn || null,
+      externalId: externalId || null,
+      region,
+      email: (form.querySelector('#email') as HTMLInputElement)?.value.trim() || 'user@example.com',
+      fullName: (form.querySelector('#fullName') as HTMLInputElement)?.value.trim() || 'User'
+    };
+
+    fetch('http://localhost:8000/api/aws/connect', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload)
+    })
+    .then(async (response) => {
+      if (!response.ok) {
+        let errMessage = 'Failed to connect to AWS';
+        try {
+          const err = await response.json();
+          errMessage = err.detail || errMessage;
+        } catch (e) {
+          // If response is not JSON
+        }
+        throw new Error(errMessage);
+      }
+      return response.json();
+    })
+    .then((data) => {
+      localStorage.setItem('aws_connected', 'true');
+      localStorage.setItem('aws_region', data.region);
+      
+      // Navigate to dashboard on successful AWS signup
+      router.navigate('/dashboard');
+    })
+    .catch((error) => {
+      // Remove any existing error messages
+      const existingError = form.querySelector('.error-message');
+      if (existingError) existingError.remove();
+
+      // Show inline error message instead of blocking alert
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'error-message';
+      errorDiv.style.color = '#ff4d4f';
+      errorDiv.style.background = 'rgba(255, 77, 79, 0.1)';
+      errorDiv.style.padding = '10px';
+      errorDiv.style.borderRadius = '4px';
+      errorDiv.style.marginBottom = '15px';
+      errorDiv.style.border = '1px solid #ff4d4f';
+      errorDiv.style.fontSize = '14px';
+      errorDiv.innerText = error.message;
+      
+      // Insert before the submit button
+      form.insertBefore(errorDiv, submitBtn);
+
+      // Reset button
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = originalBtnContent;
+    });
   }
 });
