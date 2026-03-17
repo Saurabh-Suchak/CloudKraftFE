@@ -1,0 +1,5 @@
+fastapi[standard]
+sqlalchemy
+boto3
+cryptography
+pydantic

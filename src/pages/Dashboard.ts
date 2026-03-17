@@ -58,6 +58,17 @@ export const Dashboard = (): string => {
       </aside>
       
       <main class="main-content">
+        <div id="awsConnectionBanner" class="aws-connection-banner" style="display: none; background: rgba(35, 47, 62, 0.9); color: white; padding: 10px 20px; font-size: 14px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #FF9900;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="20" height="20">
+              <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="#FF9900"/>
+              <path d="M2 17L12 22L22 17" stroke="#FF9900" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M2 12L12 17L22 12" stroke="#FF9900" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <strong>AWS Connection Active</strong>
+          </div>
+          <div>Region: <span id="awsConnectionRegion" style="color: #FF9900; font-weight: bold;"></span></div>
+        </div>
         <header class="top-bar">
           <div class="search-bar">
             <svg class="search-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -166,6 +177,20 @@ export const Dashboard = (): string => {
         </div>
       </main>
     </div>
+    <script>
+      setTimeout(() => {
+        const isConnected = localStorage.getItem('aws_connected');
+        const region = localStorage.getItem('aws_region');
+        if (isConnected === 'true') {
+          const banner = document.getElementById('awsConnectionBanner');
+          const regionSpan = document.getElementById('awsConnectionRegion');
+          if (banner && regionSpan) {
+            banner.style.display = 'flex';
+            regionSpan.textContent = region || 'Unknown';
+          }
+        }
+      }, 50);
+    </script>
   `;
 };
 

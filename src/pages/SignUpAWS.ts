@@ -23,6 +23,24 @@ export const SignUpAWS = (): string => {
           <p class="login-subtitle">Connect your AWS account to get started with CloudKraft.</p>
           
           <form class="login-form" id="awsSignupForm">
+          
+            <div class="auth-method-selector">
+              <label class="radio-card">
+                <input type="radio" name="authMethod" value="access_key">
+                <div class="radio-card-content">
+                  <span class="radio-title">Using Access Keys</span>
+                </div>
+              </label>
+              <label class="radio-card">
+                <input type="radio" name="authMethod" value="assume_role" checked>
+                <div class="radio-card-content">
+                  <span class="radio-title" style="white-space: nowrap;">Using Assume Role</span>
+                </div>
+              </label>
+            </div>
+
+            <!-- Access Key Section -->
+            <div id="accessKeySection" class="auth-section" style="display: none;">
             <div class="form-group">
               <label for="awsAccessKey" class="form-label">AWS Access Key ID</label>
               <input 
@@ -31,7 +49,6 @@ export const SignUpAWS = (): string => {
                 name="awsAccessKey" 
                 class="form-input" 
                 placeholder="AKIAIOSFODNN7EXAMPLE"
-                required
               />
               <small class="form-hint">Your AWS Access Key ID</small>
             </div>
@@ -45,7 +62,6 @@ export const SignUpAWS = (): string => {
                   name="awsSecretKey" 
                   class="form-input" 
                   placeholder="Enter your AWS Secret Key"
-                  required
                 />
                 <button type="button" class="password-toggle" id="awsSecretToggle">
                   <svg class="eye-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -56,6 +72,53 @@ export const SignUpAWS = (): string => {
               </div>
               <small class="form-hint">Your AWS Secret Access Key (keep this secure)</small>
             </div>
+            </div> <!-- End Access Key Section -->
+
+            <!-- Assume Role Section -->
+            <div id="assumeRoleSection" class="auth-section active">
+              <div class="instructions-box">
+                <h4>Step 1: Create a new AWS connection</h4>
+                <p>Create an IAM Role in your AWS account to enable CloudKraft to perform actions on your behalf.</p>
+                <div class="info-block" style="background: var(--surface-100); padding: 12px; border-radius: 6px; position: relative;">
+                  <p style="margin-bottom: 12px;"><strong>Enable Require external ID with:</strong> <span id="displayExternalId" class="code-span">Generating...</span></p>
+                  
+                  <p style="margin-bottom: 8px; font-size: 13px;"><strong>Custom Trust Policy:</strong></p>
+                  <pre style="margin: 0; font-family: monospace; font-size: 12px; color: var(--text-600); white-space: pre-wrap; word-break: break-all; background: var(--surface-200); padding: 10px; border-radius: 4px;">
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "AWS": "arn:aws:iam::059801127401:user/cloudkraft"
+            },
+            "Action": "sts:AssumeRole",
+            "Condition": {
+                "StringEquals": {
+                    "sts:ExternalId": "PUT THE EXTERNAL ID"
+                }
+            }
+        }
+    ]
+}
+                  </pre>
+                </div>
+              </div>
+
+              <div class="form-group margin-top-1rem">
+                <h4>Step 2: Enter Role ARN</h4>
+                <p class="instructions-text">Open the role you just created, copy the ARN and paste in the field below.</p>
+                <label for="awsRoleArn" class="form-label">Role ARN</label>
+                <input 
+                  type="text" 
+                  id="awsRoleArn" 
+                  name="awsRoleArn" 
+                  class="form-input" 
+                  placeholder="arn:aws:iam::123456789012:role/CloudKraftRole"
+                />
+                <input type="hidden" id="awsExternalId" name="awsExternalId" />
+              </div>
+            </div> <!-- End Assume Role Section -->
             
             <div class="form-group">
               <label for="awsRegion" class="form-label">AWS Region</label>
