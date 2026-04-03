@@ -20,52 +20,43 @@ export const WorkflowDesigner = (): string => {
             </svg>
             <span>Projects</span>
           </a>
-          <a href="/templates" data-navigate="/templates" class="nav-item">
-            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect x="3" y="3" width="7" height="7" stroke="currentColor" stroke-width="2"/>
-              <rect x="14" y="3" width="7" height="7" stroke="currentColor" stroke-width="2"/>
-              <rect x="3" y="14" width="7" height="7" stroke="currentColor" stroke-width="2"/>
-              <rect x="14" y="14" width="7" height="7" stroke="currentColor" stroke-width="2"/>
-            </svg>
-            <span>Templates</span>
-          </a>
-          <a href="/deployments" data-navigate="/deployments" class="nav-item">
+          <a href="/deployment" data-navigate="/deployment" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
               <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
               <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            <span>Deployments</span>
-          </a>
-          <a href="/settings" data-navigate="/settings" class="nav-item">
-            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
-              <path d="M12 1V3M12 21V23M4.22 4.22L5.64 5.64M18.36 18.36L19.78 19.78M1 12H3M21 12H23M4.22 19.78L5.64 18.36M18.36 5.64L19.78 4.22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            </svg>
-            <span>Settings</span>
+            <span>Deployment</span>
           </a>
         </nav>
         
         <div class="sidebar-footer">
           <div class="user-profile">
-            <div class="user-avatar">JD</div>
+            <div class="user-avatar" data-user-avatar>U</div>
             <div class="user-info">
-              <div class="user-name">John Doe</div>
-              <div class="user-email">john.doe@email.com</div>
+              <div class="user-name" data-user-name>User</div>
+              <div class="user-email" data-user-email></div>
             </div>
           </div>
+          <button class="btn-logout" id="logoutBtn">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M9 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M16 17L21 12L16 7M21 12H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Log out
+          </button>
         </div>
       </aside>
-      
+
       <main class="workflow-main">
         <header class="workflow-header">
-          <h2 class="workflow-title">6.3.3 Visual Workflow Designer</h2>
+          <h2 class="workflow-title">Workflow Designer</h2>
           <div class="workflow-actions">
-            <button class="btn btn-outline">Validate</button>
-            <button class="btn btn-outline">Generate Code</button>
-            <button class="btn btn-outline">Import</button>
-            <button class="btn btn-outline">Save</button>
-            <button class="btn btn-primary">Deploy</button>
+            <button class="btn btn-outline" id="validateBtn">Validate</button>
+            <button class="btn btn-outline" id="generateCodeBtn">Generate Code</button>
+            <button class="btn btn-outline" id="clearCanvasBtn">Clear</button>
+            <button class="btn btn-outline" id="saveBtn">Save</button>
+            <button class="btn btn-primary" id="deployBtn">Deploy</button>
           </div>
         </header>
         
@@ -246,7 +237,7 @@ export const WorkflowDesigner = (): string => {
               </div>
             </div>
           </aside>
-          
+
           <div class="canvas-container">
             <div class="workflow-canvas" id="workflowCanvas">
               <!-- Canvas grid background -->
@@ -258,7 +249,19 @@ export const WorkflowDesigner = (): string => {
                 </defs>
                 <rect width="100%" height="100%" fill="url(#grid)" />
               </svg>
-              
+
+              <!-- SVG layer for node connections -->
+              <svg class="connections-layer" id="connectionsLayer">
+                <defs>
+                  <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+                    <polygon points="0 0, 8 3, 0 6" fill="#3b82f6"/>
+                  </marker>
+                  <marker id="arrow-selected" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+                    <polygon points="0 0, 8 3, 0 6" fill="#f59e0b"/>
+                  </marker>
+                </defs>
+              </svg>
+
               <!-- Nodes will be dynamically added here via drag and drop -->
             </div>
           </div>
@@ -270,6 +273,13 @@ export const WorkflowDesigner = (): string => {
                 <p>Select a resource from the canvas to configure it.</p>
               </div>
             </div>
+            <button class="btn-delete-resource" id="deleteResourceBtn" style="display:none">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M3 6H5H21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                <path d="M8 6V4C8 3.46957 8.21071 2.96086 8.58579 2.58579C8.96086 2.21071 9.46957 2 10 2H14C14.5304 2 15.0391 2.21071 15.4142 2.58579C15.7893 2.96086 16 3.46957 16 4V6M19 6L18.1327 19.1425C18.0579 20.1891 17.187 21 16.1378 21H7.86224C6.81296 21 5.94208 20.1891 5.86732 19.1425L5 6H19Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              Delete Resource
+            </button>
           </aside>
         </div>
       </main>
