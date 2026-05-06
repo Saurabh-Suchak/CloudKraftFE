@@ -1,5 +1,6 @@
-// Code Viewer functionality
+// Code Viewer functionality — Monaco Editor + validation + cost estimate
 import { apiService } from './services/api';
+import loader from '@monaco-editor/loader';
 
 interface TerraformFile {
   filename: string;
@@ -11,26 +12,185 @@ const FILE_ORDER = ['versions.tf', 'variables.tf', 'main.tf', 'outputs.tf', 'ter
 
 let currentFiles: TerraformFile[] = [];
 let activeFile = 'main.tf';
+let monacoEditor: any = null;   // Monaco IStandaloneCodeEditor instance
+let monacoInstance: any = null; // Monaco API (languages, editor namespace)
+let isValidating = false;
 
+// ------------------------------------------------------------------
+// HCL language definition for Monaco
+// ------------------------------------------------------------------
+function registerHclLanguage(monaco: any): void {
+  if (monaco.languages.getLanguages().some((l: any) => l.id === 'hcl')) return;
+
+  monaco.languages.register({ id: 'hcl' });
+
+  monaco.languages.setMonarchTokensProvider('hcl', {
+    keywords: [
+      'resource', 'variable', 'output', 'provider', 'terraform',
+      'data', 'module', 'locals', 'true', 'false', 'null', 'for_each',
+      'count', 'depends_on', 'lifecycle', 'dynamic',
+    ],
+    tokenizer: {
+      root: [
+        // Line comments
+        [/#.*$/, 'comment'],
+        // Block comments
+        [/\/\*/, 'comment', '@blockComment'],
+        // Heredoc
+        [/<<-?\w+/, 'string'],
+        // Strings
+        [/"/, 'string', '@string'],
+        // Numbers
+        [/\b\d+(\.\d+)?\b/, 'number'],
+        // Keywords
+        [/\b(resource|variable|output|provider|terraform|data|module|locals|true|false|null|for_each|count|depends_on|lifecycle|dynamic)\b/, 'keyword'],
+        // Built-in functions
+        [/\b(jsonencode|jsondecode|toset|tolist|tomap|lookup|merge|concat|length|format|trimspace|file|templatefile)\b/, 'predefined'],
+        // Resource references like aws_vpc.main.id
+        [/[a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*/, 'variable.name'],
+        // Attribute names (before =)
+        [/[a-z_][a-z0-9_-]*(?=\s*=)/, 'attribute.name'],
+        // Block labels
+        [/[a-z_][a-z0-9_]*/, 'identifier'],
+        // Delimiters
+        [/[{}[\]()]/, 'delimiter'],
+        // Operators
+        [/[=<>!?:+\-*\/]/, 'operator'],
+      ],
+      string: [
+        [/\$\{/, 'string.escape', '@interpolation'],
+        [/[^"$\\]+/, 'string'],
+        [/\\./, 'string.escape'],
+        [/"/, 'string', '@pop'],
+      ],
+      interpolation: [
+        [/\}/, 'string.escape', '@pop'],
+        { include: 'root' },
+      ],
+      blockComment: [
+        [/\*\//, 'comment', '@pop'],
+        [/./, 'comment'],
+      ],
+    },
+  });
+
+  monaco.languages.setLanguageConfiguration('hcl', {
+    comments: { lineComment: '#', blockComment: ['/*', '*/'] },
+    brackets: [['{', '}'], ['[', ']'], ['(', ')']],
+    autoClosingPairs: [
+      { open: '{', close: '}' },
+      { open: '[', close: ']' },
+      { open: '(', close: ')' },
+      { open: '"', close: '"' },
+    ],
+    surroundingPairs: [
+      { open: '{', close: '}' },
+      { open: '[', close: ']' },
+      { open: '(', close: ')' },
+      { open: '"', close: '"' },
+    ],
+    indentationRules: {
+      increaseIndentPattern: /^.*\{[^}]*$/,
+      decreaseIndentPattern: /^\s*\}/,
+    },
+  });
+
+  // Dark theme matching CloudKraft's dark UI
+  monaco.editor.defineTheme('cloudkraft-dark', {
+    base: 'vs-dark',
+    inherit: true,
+    rules: [
+      { token: 'keyword',        foreground: 'c792ea', fontStyle: 'bold' },
+      { token: 'string',         foreground: 'c3e88d' },
+      { token: 'string.escape',  foreground: 'f78c6c' },
+      { token: 'comment',        foreground: '546e7a', fontStyle: 'italic' },
+      { token: 'number',         foreground: 'f78c6c' },
+      { token: 'variable.name',  foreground: '82aaff' },
+      { token: 'attribute.name', foreground: 'b2ccd6' },
+      { token: 'predefined',     foreground: '89ddff' },
+      { token: 'operator',       foreground: '89ddff' },
+      { token: 'delimiter',      foreground: 'a6accd' },
+      { token: 'identifier',     foreground: 'eeffff' },
+    ],
+    colors: {
+      'editor.background':           '#0f172a',
+      'editor.foreground':           '#e2e8f0',
+      'editorLineNumber.foreground': '#334155',
+      'editorLineNumber.activeForeground': '#64748b',
+      'editor.selectionBackground':  '#1e3a5f',
+      'editor.lineHighlightBackground': '#1e293b',
+      'editorCursor.foreground':     '#7c3aed',
+      'editorIndentGuide.background1': '#1e293b',
+      'editorWidget.background':     '#1e293b',
+      'editorSuggestWidget.background': '#1e293b',
+      'editorSuggestWidget.border':  '#334155',
+    },
+  });
+}
+
+// ------------------------------------------------------------------
+// Initialise Monaco editor (runs once per page load)
+// ------------------------------------------------------------------
+async function initMonaco(): Promise<void> {
+  const container = document.getElementById('monacoEditorContainer');
+  if (!container) return;
+
+  if (monacoEditor) {
+    // Editor already exists — just resize it (container may have changed)
+    monacoEditor.layout();
+    return;
+  }
+
+  const monaco = await loader.init();
+  monacoInstance = monaco;
+
+  registerHclLanguage(monaco);
+
+  monacoEditor = monaco.editor.create(container, {
+    value: '',
+    language: 'hcl',
+    theme: 'cloudkraft-dark',
+    readOnly: true,
+    fontSize: 13,
+    fontFamily: "'JetBrains Mono', 'Fira Code', 'Courier New', monospace",
+    fontLigatures: true,
+    lineNumbers: 'on',
+    minimap: { enabled: true, scale: 1 },
+    scrollBeyondLastLine: false,
+    automaticLayout: true,
+    tabSize: 2,
+    wordWrap: 'off',
+    renderWhitespace: 'selection',
+    smoothScrolling: true,
+    cursorBlinking: 'smooth',
+    renderLineHighlight: 'line',
+    scrollbar: {
+      verticalScrollbarSize: 6,
+      horizontalScrollbarSize: 6,
+    },
+  });
+}
+
+// ------------------------------------------------------------------
+// Public entry point
+// ------------------------------------------------------------------
 export function initCodeViewer(): void {
-  // Reset state on every call — module-level variables persist across SPA
-  // navigations, so we must re-initialise each time the page is rendered.
+  // Reset state — module-level variables persist across SPA navigations
   currentFiles = [];
   activeFile = 'main.tf';
   isValidating = false;
+  monacoEditor = null;  // will be re-created for this page instance
 
-  // Load all generated files from localStorage
+  // Load generated files from localStorage
   const filesJson = localStorage.getItem('generated_terraform_files');
   const legacyCode = localStorage.getItem('generated_terraform');
 
   if (filesJson) {
     try {
       const parsed: TerraformFile[] = JSON.parse(filesJson);
-      // Sort by our preferred tab order
       currentFiles = FILE_ORDER
         .map(name => parsed.find(f => f.filename === name))
         .filter((f): f is TerraformFile => !!f);
-      // Append any extra files not in FILE_ORDER
       parsed.forEach(f => {
         if (!FILE_ORDER.includes(f.filename)) currentFiles.push(f);
       });
@@ -38,25 +198,27 @@ export function initCodeViewer(): void {
       currentFiles = legacyCode ? [{ filename: 'main.tf', content: legacyCode }] : [];
     }
   } else if (legacyCode) {
-    // Fallback for old sessions that only stored terraform_code
     currentFiles = [{ filename: 'main.tf', content: legacyCode }];
   }
 
   if (currentFiles.length === 0) return;
 
-  // Default to main.tf, or first file if main.tf not present
   activeFile = currentFiles.find(f => f.filename === 'main.tf')?.filename
     ?? currentFiles[0].filename;
 
   renderTabs();
-  showFile(activeFile);
 
-  // Validate on load using combined versions+variables+main (provider block lives in versions.tf)
-  const combinedForValidation = currentFiles
-    .filter(f => ['versions.tf', 'variables.tf', 'main.tf'].includes(f.filename))
-    .map(f => f.content)
-    .join('\n');
-  if (combinedForValidation.trim()) validateAndDisplayResults(combinedForValidation);
+  // Init Monaco then show the active file
+  initMonaco().then(() => {
+    showFile(activeFile);
+
+    // Validate on load
+    const combinedForValidation = currentFiles
+      .filter(f => ['versions.tf', 'variables.tf', 'main.tf'].includes(f.filename))
+      .map(f => f.content)
+      .join('\n');
+    if (combinedForValidation.trim()) validateAndDisplayResults(combinedForValidation, currentFiles);
+  });
 
   setupExportButton();
   setupValidateButton();
@@ -68,7 +230,6 @@ export function initCodeViewer(): void {
 // ------------------------------------------------------------------
 // Tab rendering & switching
 // ------------------------------------------------------------------
-
 function renderTabs(): void {
   const tabsContainer = document.getElementById('fileTabs');
   if (!tabsContainer) return;
@@ -93,25 +254,34 @@ function renderTabs(): void {
 
 function showFile(filename: string): void {
   const file = currentFiles.find(f => f.filename === filename);
-  const codeEl = document.getElementById('codeContent');
-  if (codeEl && file) {
-    codeEl.textContent = file.content;
+  if (!file) return;
+
+  if (monacoEditor && monacoInstance) {
+    // Determine language from file extension
+    const lang = filename.endsWith('.tfvars') ? 'hcl'
+      : filename.endsWith('.tf') ? 'hcl'
+      : filename.endsWith('.json') ? 'json'
+      : 'plaintext';
+
+    const currentModel = monacoEditor.getModel();
+    if (currentModel) {
+      monacoInstance.editor.setModelLanguage(currentModel, lang);
+    }
+    monacoEditor.setValue(file.content);
+    monacoEditor.setScrollPosition({ scrollTop: 0 });
   }
 }
 
 // ------------------------------------------------------------------
-// Export — download all files as a zip-style bundle or individual file
+// Export
 // ------------------------------------------------------------------
-
 function setupExportButton(): void {
   const exportBtn = document.getElementById('exportBtn');
   if (!exportBtn) return;
-
   const newBtn = exportBtn.cloneNode(true) as HTMLButtonElement;
   exportBtn.parentNode?.replaceChild(newBtn, exportBtn);
 
   newBtn.addEventListener('click', () => {
-    // Download each file individually
     currentFiles.forEach(file => {
       const blob = new Blob([file.content], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
@@ -127,23 +297,20 @@ function setupExportButton(): void {
 // ------------------------------------------------------------------
 // Validation
 // ------------------------------------------------------------------
-
 function setupValidateButton(): void {
   const validateBtn = document.querySelector('.code-viewer-header .btn-outline');
   if (!validateBtn) return;
-
   const newBtn = validateBtn.cloneNode(true) as HTMLButtonElement;
   validateBtn.parentNode?.replaceChild(newBtn, validateBtn);
 
   newBtn.addEventListener('click', async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    // Validate the combined terraform code (versions + variables + main)
     const combined = currentFiles
       .filter(f => ['versions.tf', 'variables.tf', 'main.tf'].includes(f.filename))
       .map(f => f.content)
       .join('\n');
-    if (combined.trim()) await validateAndDisplayResults(combined);
+    if (combined.trim()) await validateAndDisplayResults(combined, currentFiles);
   });
 }
 
@@ -169,6 +336,9 @@ function setupDeployButton(): void {
   });
 }
 
+// ------------------------------------------------------------------
+// Cost estimate
+// ------------------------------------------------------------------
 const RESOURCE_ICONS: Record<string, string> = {
   aws_instance:                 '🖥️',
   aws_lambda_function:          '⚡',
@@ -217,7 +387,6 @@ async function loadCostEstimate(): Promise<void> {
     }
 
     const { total_monthly_low, total_monthly_high, line_items, disclaimer } = result.data;
-
     const totalIsFree = total_monthly_low === 0 && total_monthly_high === 0;
 
     const rows = line_items.map(item => {
@@ -226,7 +395,6 @@ async function loadCostEstimate(): Promise<void> {
       const costBadge = isFree
         ? `<span class="cost-badge cost-badge-free">Free</span>`
         : `<span class="cost-badge cost-badge-paid">$${item.monthly_usd_low.toFixed(0)}–$${item.monthly_usd_high.toFixed(0)}<span class="cost-per-mo">/mo</span></span>`;
-
       return `
         <div class="cost-row" title="${item.notes}">
           <div class="cost-row-icon">${icon}</div>
@@ -254,9 +422,7 @@ async function loadCostEstimate(): Promise<void> {
         </div>
         <div class="cost-header-sub">${line_items.length} resource${line_items.length !== 1 ? 's' : ''} · us-east-1 on-demand</div>
       </div>
-
       <div class="cost-rows">${rows}</div>
-
       <div class="cost-footer">
         <svg viewBox="0 0 24 24" fill="none" width="11" height="11" style="flex-shrink:0;margin-top:1px">
           <path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10zm-1-7v2h2v-2h-2zm0-8v6h2V7h-2z" fill="currentColor"/>
@@ -268,22 +434,44 @@ async function loadCostEstimate(): Promise<void> {
   }
 }
 
-let isValidating = false;
-
-async function validateAndDisplayResults(terraformCode: string): Promise<void> {
+// ------------------------------------------------------------------
+// Validation results
+// ------------------------------------------------------------------
+async function validateAndDisplayResults(
+  terraformCode: string,
+  files?: TerraformFile[],
+): Promise<void> {
   if (isValidating) return;
   if (!terraformCode?.trim()) return;
 
   isValidating = true;
+
+  const validationListEl = document.querySelector('.validation-list');
+  if (validationListEl) {
+    validationListEl.innerHTML = `
+      <div class="validation-item" style="justify-content:center;gap:0.5rem">
+        <span class="validate-spinner"></span>
+        <span style="color:var(--text-secondary);font-size:0.85rem">Running validation…</span>
+      </div>`;
+  }
+
   try {
-    const result = await apiService.validateCode(terraformCode);
+    const result = await apiService.validateCode(terraformCode, files);
     if (result.error) {
-      console.error('Validation error:', result.error);
+      if (validationListEl) {
+        validationListEl.innerHTML = `<div class="validation-item error" style="padding:0.75rem">
+          <div class="validation-content"><div class="validation-message">${result.error}</div></div>
+        </div>`;
+      }
       return;
     }
 
     if (result.data) {
-      const { valid, errors, warnings } = result.data;
+      const { valid, errors, warnings, method, validator_version } = result.data;
+
+      const methodBadge = method === 'terraform'
+        ? `<span class="validator-badge validator-badge-real">✓ Terraform${validator_version ? ` v${validator_version}` : ''}</span>`
+        : `<span class="validator-badge validator-badge-static">⚠ Static analysis</span>`;
 
       const summary = document.querySelector('.validation-summary');
       if (summary) {
@@ -294,6 +482,7 @@ async function validateAndDisplayResults(terraformCode: string): Promise<void> {
             Validation ${valid ? 'Successful' : 'Failed'}
             (${errors.length + warnings.length} Total Issues)
           </span>
+          ${methodBadge}
         `;
       }
 
@@ -301,7 +490,6 @@ async function validateAndDisplayResults(terraformCode: string): Promise<void> {
       if (!validationList) return;
 
       let html = '';
-
       if (valid && errors.length === 0 && warnings.length === 0) {
         html = `
           <div class="validation-item success">

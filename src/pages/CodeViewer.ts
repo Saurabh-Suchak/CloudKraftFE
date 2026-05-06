@@ -80,8 +80,8 @@ export const CodeViewer = (): string => {
                 <!-- populated by codeviewer.ts -->
               </div>
             </div>
-            <div class="code-editor">
-              <pre><code id="codeContent"></code></pre>
+            <div class="code-editor" id="monacoEditorContainer">
+              <!-- Monaco Editor mounts here -->
             </div>
             <div class="editor-footer">
               <span class="validation-summary">

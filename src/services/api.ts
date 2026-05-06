@@ -169,8 +169,19 @@ class ApiService {
     });
   }
 
+  // AI Architecture Generation
+  async generateFromPrompt(prompt: string) {
+    return this.request<{ workflow_state: any; description: string }>('/api/ai/generate', {
+      method: 'POST',
+      body: JSON.stringify({ prompt }),
+    });
+  }
+
   // Validation
-  async validateCode(terraformCode: string) {
+  async validateCode(
+    terraformCode: string,
+    files?: Array<{ filename: string; content: string }>,
+  ) {
     return this.request<{
       valid: boolean;
       errors: Array<{
@@ -189,9 +200,11 @@ class ApiService {
         column?: number;
         resource?: string;
       }>;
+      method: string;
+      validator_version?: string;
     }>('/api/validation/validate', {
       method: 'POST',
-      body: JSON.stringify({ terraform_code: terraformCode }),
+      body: JSON.stringify({ terraform_code: terraformCode, files: files ?? [] }),
     });
   }
 }
