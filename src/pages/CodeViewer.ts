@@ -12,7 +12,7 @@ export const CodeViewer = (): string => {
             <span class="logo-text">CloudKraft</span>
           </div>
         </div>
-        
+
         <nav class="sidebar-nav">
           <a href="/dashboard" data-navigate="/dashboard" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -20,134 +20,89 @@ export const CodeViewer = (): string => {
             </svg>
             <span>Projects</span>
           </a>
-          <a href="/templates" data-navigate="/templates" class="nav-item">
+          <a href="/workflow" data-navigate="/workflow" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect x="3" y="3" width="7" height="7" stroke="currentColor" stroke-width="2"/>
-              <rect x="14" y="3" width="7" height="7" stroke="currentColor" stroke-width="2"/>
-              <rect x="3" y="14" width="7" height="7" stroke="currentColor" stroke-width="2"/>
-              <rect x="14" y="14" width="7" height="7" stroke="currentColor" stroke-width="2"/>
+              <rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/>
+              <rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/>
+              <rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/>
+              <rect x="14" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/>
             </svg>
-            <span>Templates</span>
+            <span>Designer</span>
           </a>
-          <a href="/deployments" data-navigate="/deployments" class="nav-item">
+          <a href="/deployment" data-navigate="/deployment" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
               <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
               <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            <span>Deployments</span>
-          </a>
-          <a href="/settings" data-navigate="/settings" class="nav-item">
-            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
-              <path d="M12 1V3M12 21V23M4.22 4.22L5.64 5.64M18.36 18.36L19.78 19.78M1 12H3M21 12H23M4.22 19.78L5.64 18.36M18.36 5.64L19.78 4.22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            </svg>
-            <span>Settings</span>
+            <span>Deployment</span>
           </a>
         </nav>
-        
+
         <div class="sidebar-footer">
           <div class="user-profile">
-            <div class="user-avatar">JD</div>
+            <div class="user-avatar" data-user-avatar>U</div>
             <div class="user-info">
-              <div class="user-name">John Doe</div>
-              <div class="user-email">john.doe@email.com</div>
+              <div class="user-name" data-user-name>User</div>
+              <div class="user-email" data-user-email></div>
             </div>
           </div>
+          <button class="btn-logout" id="logoutBtn">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M9 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M16 17L21 12L16 7M21 12H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Log out
+          </button>
         </div>
       </aside>
-      
+
       <main class="code-viewer-main">
         <header class="code-viewer-header">
-          <h2 class="page-title">6.3.4 Code Viewer & Validation</h2>
+          <h2 class="page-title">Code Viewer</h2>
           <div class="header-actions">
-            <button class="btn btn-outline">Export</button>
-            <button class="btn btn-primary">Deploy</button>
-            <div class="user-avatar-small">JD</div>
+            <button class="btn btn-outline" id="backToDesignerBtn">
+              <svg style="width:0.85rem;height:0.85rem;margin-right:0.25rem;vertical-align:-1px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M19 12H5M5 12L12 19M5 12L12 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              Designer
+            </button>
+            <button class="btn btn-outline" id="exportBtn">Export</button>
+            <button class="btn btn-primary" id="codeViewerDeployBtn">Deploy</button>
+            <div class="user-avatar-small" data-user-avatar>U</div>
           </div>
         </header>
-        
+
         <div class="code-viewer-content">
           <div class="code-editor-panel">
             <div class="editor-header">
-              <span class="file-name">main.tf</span>
+              <div class="file-tabs" id="fileTabs">
+                <!-- populated by codeviewer.ts -->
+              </div>
             </div>
-            <div class="code-editor">
-              <pre><code>resource "aws_vpc" "main" {
-  cidr_block       = "10.0.0.0/16"
-  instance_tenancy = "default"
-}
-
-resource "aws_subnet" "public" {
-  vpc_id     = aws_vpc.main.id
-  cidr_block = "10.0.1.0/24"
-}
-
-resource "aws_security_group" "allow_ssh" {
-  name        = "allow_ssh"
-  description = "Allow SSH inbound traffic"
-  vpc_id      = aws_vpc.main.id
-
-  ingress {
-    description = "SSH from anywhere"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-}</code></pre>
+            <div class="code-editor" id="monacoEditorContainer">
+              <!-- Monaco Editor mounts here -->
             </div>
             <div class="editor-footer">
               <span class="validation-summary">
-                1 Error Found, 1 Warning
-                <span class="validation-status">Validation Successful (2/4 Passed)</span>
+                <span class="validation-status">Running validation...</span>
               </span>
             </div>
           </div>
-          
+
           <div class="validation-panel">
             <h3 class="panel-title">Validation Results</h3>
             <div class="validation-list">
-              <div class="validation-item success">
-                <svg class="validation-icon success" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M20 6L9 17L4 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
+              <div class="validation-item">
                 <div class="validation-content">
-                  <div class="validation-title">Security Group Rules Check</div>
-                  <div class="validation-message">All security group ingress/egress rules conform to the organization's policies. No unrestricted ports found.</div>
+                  <div class="validation-message">Validating configuration...</div>
                 </div>
               </div>
-              
-              <div class="validation-item error">
-                <svg class="validation-icon error" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
-                  <path d="M12 8V12M12 16H12.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                </svg>
-                <div class="validation-content">
-                  <div class="validation-title">IAM Policy Check</div>
-                  <div class="validation-message">Error message details...</div>
-                </div>
-              </div>
-              
-              <div class="validation-item warning">
-                <svg class="validation-icon warning" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M12 9V13M12 17H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-                <div class="validation-content">
-                  <div class="validation-title">Resource Naming Convention</div>
-                  <div class="validation-message">Warning message details...</div>
-                </div>
-              </div>
-              
-              <div class="validation-item success">
-                <svg class="validation-icon success" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M20 6L9 17L4 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-                <div class="validation-content">
-                  <div class="validation-title">VPC CIDR Range Check</div>
-                  <div class="validation-message">VPC CIDR block '10.0.0.0/16' is within the approved range for production environments.</div>
-                </div>
-              </div>
+            </div>
+
+            <h3 class="panel-title" style="margin-top:1.25rem">Cost Estimate</h3>
+            <div class="cost-estimate-panel" id="costEstimatePanel">
+              <div class="cost-loading">Calculating estimate...</div>
             </div>
           </div>
         </div>
@@ -155,4 +110,3 @@ resource "aws_security_group" "allow_ssh" {
     </div>
   `;
 };
-
