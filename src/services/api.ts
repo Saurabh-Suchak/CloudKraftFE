@@ -37,6 +37,10 @@ class ApiService {
         return { error: error.detail || `HTTP ${response.status}` };
       }
 
+      if (response.status === 204 || response.headers.get('content-length') === '0') {
+        return { data: undefined as T };
+      }
+
       const data = await response.json();
       return { data };
     } catch (error) {
@@ -178,6 +182,44 @@ class ApiService {
   }
 
   // Validation
+  // AWS Connection
+  async connectAWS(payload: {
+    auth_method: 'access_key' | 'assume_role';
+    region: string;
+    access_key?: string;
+    secret_key?: string;
+    role_arn?: string;
+    external_id?: string;
+  }) {
+    return this.request<{ connected: boolean; auth_method: string; region: string; role_arn?: string }>(
+      '/api/auth/connect-aws',
+      { method: 'POST', body: JSON.stringify(payload) }
+    );
+  }
+
+  // Deployments
+  async listDeployments() {
+    return this.request<any[]>('/api/deploy/');
+  }
+
+  async getDeployment(id: number) {
+    return this.request<any>(`/api/deploy/${id}`);
+  }
+
+  async destroyDeployment(id: number) {
+    return this.request<any>(`/api/deploy/${id}/destroy`, { method: 'POST' });
+  }
+
+  async getDeploymentLogs(id: number, afterId = 0) {
+    return this.request<{ logs: any[]; deployment_status: string }>(`/api/deploy/${id}/logs?after_id=${afterId}`);
+  }
+
+  async getAWSStatus() {
+    return this.request<{ connected: boolean; auth_method: string | null; region: string | null; role_arn: string | null; external_id: string | null }>(
+      '/api/auth/aws-status'
+    );
+  }
+
   async validateCode(
     terraformCode: string,
     files?: Array<{ filename: string; content: string }>,

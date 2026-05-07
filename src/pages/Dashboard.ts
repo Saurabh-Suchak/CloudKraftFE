@@ -20,6 +20,30 @@ export const Dashboard = (): string => {
             </svg>
             <span>Projects</span>
           </a>
+          <a href="/aws-connect" data-navigate="/aws-connect" class="nav-item">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M20 16.2A4.5 4.5 0 0 0 17.5 8h-1.8A7 7 0 1 0 4 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M12 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0-2 0M12 13v4M10 19h4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span>AWS Connect</span>
+          </a>
+          <a href="/workflow" data-navigate="/workflow" class="nav-item">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/>
+              <rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/>
+              <rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/>
+              <rect x="14" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/>
+            </svg>
+            <span>Designer</span>
+          </a>
+          <a href="/deployments" data-navigate="/deployments" class="nav-item">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span>Deployments</span>
+          </a>
         </nav>
 
         <div class="sidebar-footer">
@@ -41,16 +65,12 @@ export const Dashboard = (): string => {
       </aside>
 
       <main class="main-content">
-        <div id="awsConnectionBanner" class="aws-connection-banner" style="display: none; background: rgba(35, 47, 62, 0.9); color: white; padding: 10px 20px; font-size: 14px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #FF9900;">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="20" height="20">
-              <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="#FF9900"/>
-              <path d="M2 17L12 22L22 17" stroke="#FF9900" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M2 12L12 17L22 12" stroke="#FF9900" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            <strong>AWS Connection Active</strong>
+        <div id="awsConnectionBanner" class="aws-connection-banner">
+          <div class="aws-banner-left">
+            <span class="aws-banner-dot" id="awsBannerDot"></span>
+            <strong id="awsBannerLabel">Checking AWS connection...</strong>
           </div>
-          <div>Region: <span id="awsConnectionRegion" style="color: #FF9900; font-weight: bold;"></span></div>
+          <div id="awsBannerRight" class="aws-banner-right"></div>
         </div>
         <header class="top-bar">
           <div class="search-bar">
@@ -82,12 +102,13 @@ export const Dashboard = (): string => {
                 <tr>
                   <th>PROJECT NAME</th>
                   <th>LAST MODIFIED</th>
+                  <th>STATUS</th>
                   <th>ACTIONS</th>
                 </tr>
               </thead>
               <tbody id="workflowsTableBody">
                 <tr>
-                  <td colspan="3" class="table-loading">Loading projects...</td>
+                  <td colspan="4" class="table-loading">Loading projects...</td>
                 </tr>
               </tbody>
             </table>

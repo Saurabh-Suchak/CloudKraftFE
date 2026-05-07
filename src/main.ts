@@ -6,6 +6,8 @@ import { Dashboard } from './pages/Dashboard';
 import { WorkflowDesigner } from './pages/WorkflowDesigner';
 import { CodeViewer } from './pages/CodeViewer';
 import { DeploymentStatus } from './pages/DeploymentStatus';
+import { AWSConnect } from './pages/AWSConnect';
+import { DeploymentsList } from './pages/DeploymentsList';
 import { NotFound } from './pages/NotFound';
 import './styles/main.css';
 import { reinitWorkflowDesigner, resetWorkflowDesignerInit, loadWorkflowState } from './workflow';
@@ -22,7 +24,18 @@ router.addRoute('/dashboard', Dashboard);
 router.addRoute('/workflow', WorkflowDesigner);
 router.addRoute('/code', CodeViewer);
 router.addRoute('/deployment', DeploymentStatus);
+router.addRoute('/aws-connect', AWSConnect);
+router.addRoute('/deployments', DeploymentsList);
 router.addRoute('*', NotFound);
+
+const PUBLIC_ROUTES = new Set(['/', '/login', '/signup', '/signup-aws']);
+
+router.setGuard((to: string) => {
+  const token = localStorage.getItem('auth_token');
+  if (!token && !PUBLIC_ROUTES.has(to)) return '/login';
+  if (token && (to === '/' || to === '/login')) return '/dashboard';
+  return null;
+});
 
 // Initialize router
 if (document.readyState === 'loading') {
@@ -96,19 +109,75 @@ async function initDashboard(): Promise<void> {
     localStorage.removeItem('current_workflow_name');
   });
 
-  tbody.innerHTML = '<tr><td colspan="3" class="table-loading">Loading projects...</td></tr>';
+  // AWS connection banner — always fetch live from API
+  const banner     = document.getElementById('awsConnectionBanner');
+  const bannerDot  = document.getElementById('awsBannerDot');
+  const bannerLabel = document.getElementById('awsBannerLabel');
+  const bannerRight = document.getElementById('awsBannerRight');
+  if (banner) {
+    const awsStatus = await apiService.getAWSStatus();
+    const connected = awsStatus.data?.connected === true;
+    banner.className = `aws-connection-banner ${connected ? 'aws-banner-connected' : 'aws-banner-disconnected'}`;
+    if (bannerLabel) bannerLabel.textContent = connected ? 'AWS Connected' : 'AWS Not Connected';
+    if (bannerRight) {
+      bannerRight.innerHTML = connected
+        ? `Region: <strong>${awsStatus.data?.region || '—'}</strong>
+           &nbsp;|&nbsp; Auth: <strong>${awsStatus.data?.auth_method === 'assume_role' ? 'IAM Role' : 'Access Keys'}</strong>`
+        : `<a href="/aws-connect" data-navigate="/aws-connect" class="aws-banner-link">Connect AWS →</a>`;
+    }
+  }
 
-  const result = await apiService.getWorkflows();
+  tbody.innerHTML = '<tr><td colspan="4" class="table-loading">Loading projects...</td></tr>';
+
+  const [result, deplResult] = await Promise.all([
+    apiService.getWorkflows(),
+    apiService.listDeployments(),
+  ]);
+
   if (result.error) {
-    tbody.innerHTML = `<tr><td colspan="3" class="table-empty">Could not load projects: ${escapeHtml(result.error)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4" class="table-empty">Could not load projects: ${escapeHtml(result.error)}</td></tr>`;
     return;
   }
 
   const workflows: any[] = result.data || [];
   workflowsCache = workflows;
 
+  // Build map: workflow_id → latest deployment status
+  const deployments: any[] = deplResult.data || [];
+  const latestDeployStatus = new Map<number, string>();
+  for (const d of deployments) {
+    if (d.workflow_id != null) {
+      const existing = latestDeployStatus.get(d.workflow_id);
+      if (!existing || new Date(d.started_at) > new Date(deployments.find((x: any) => x.status === existing && x.workflow_id === d.workflow_id)?.started_at || 0)) {
+        latestDeployStatus.set(d.workflow_id, d.status);
+      }
+    }
+  }
+
+  const deployStatusBadge = (wfId: number): string => {
+    const status = latestDeployStatus.get(wfId);
+    if (!status) return '<span class="status-badge status-not-deployed">Not Deployed</span>';
+    const cls: Record<string, string> = {
+      succeeded: 'status-succeeded',
+      failed:    'status-failed',
+      running:   'status-running',
+      pending:   'status-pending',
+      destroying:'status-running',
+      destroyed: 'destroyed',
+    };
+    const label: Record<string, string> = {
+      succeeded: 'Deployed',
+      failed:    'Failed',
+      running:   'Deploying',
+      pending:   'Pending',
+      destroying:'Destroying',
+      destroyed: 'Destroyed',
+    };
+    return `<span class="status-badge ${cls[status] || ''}">${label[status] || status}</span>`;
+  };
+
   if (workflows.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="3" class="table-empty">No projects yet. Click "New Project" to get started.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" class="table-empty">No projects yet. Click "New Project" to get started.</td></tr>';
     return;
   }
 
@@ -116,10 +185,17 @@ async function initDashboard(): Promise<void> {
     <tr>
       <td>${escapeHtml(wf.name)}${wf.description ? `<div class="project-desc">${escapeHtml(wf.description)}</div>` : ''}</td>
       <td>${formatRelativeDate(wf.updated_at || wf.created_at)}</td>
+      <td>${deployStatusBadge(wf.id)}</td>
       <td>
         <div class="action-links">
-          <button class="action-link" data-action="open" data-id="${wf.id}">Open</button>
-          <button class="action-link action-link-danger" data-action="delete" data-id="${wf.id}" data-name="${escapeHtml(wf.name)}">Delete</button>
+          <button class="action-link" data-action="open" data-id="${wf.id}">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            Open
+          </button>
+          <button class="action-link action-link-danger" data-action="delete" data-id="${wf.id}" data-name="${escapeHtml(wf.name)}">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+            Delete
+          </button>
         </div>
       </td>
     </tr>
@@ -145,7 +221,24 @@ async function initDashboard(): Promise<void> {
     btn.addEventListener('click', async () => {
       const id   = parseInt(btn.getAttribute('data-id')   || '0');
       const name = btn.getAttribute('data-name') || 'this project';
-      if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+
+      const activeDepls = deployments.filter(
+        (d: any) => d.workflow_id === id && d.status === 'succeeded'
+      );
+
+      const confirmMsg = activeDepls.length > 0
+        ? `Delete "${name}"?\n\nThis project has ${activeDepls.length} active deployment(s). AWS resources will be destroyed before deletion.\n\nThis cannot be undone.`
+        : `Delete "${name}"? This cannot be undone.`;
+
+      if (!confirm(confirmMsg)) return;
+
+      btn.disabled = true;
+      btn.textContent = activeDepls.length > 0 ? 'Destroying...' : 'Deleting...';
+
+      // Destroy active deployments first
+      for (const d of activeDepls) {
+        await apiService.destroyDeployment(d.id);
+      }
 
       const del = await apiService.deleteWorkflow(id);
       if (del.error) { alert(`Delete failed: ${del.error}`); return; }
@@ -196,20 +289,58 @@ function onRouteChange(): void {
         }
       } catch { /* ignore malformed data */ }
     } else {
-      // Restore canvas state when navigating back from code/deployment view
       const canvasJson = localStorage.getItem('canvas_state');
-      if (canvasJson) {
-        try {
-          const state = JSON.parse(canvasJson);
-          if (state?.nodes?.length) {
-            setTimeout(() => {
-              loadWorkflowState(state);
-              setDesignerTitle(localStorage.getItem('current_workflow_name'));
-            }, 200);
+      const hasCanvas = (() => {
+        try { const s = JSON.parse(canvasJson || ''); return s?.nodes?.length > 0; } catch { return false; }
+      })();
+
+      const autoName = () => {
+        apiService.getWorkflows().then(result => {
+          const count = (result.data?.length ?? 0) + 1;
+          const name = `Workflow ${count}`;
+          localStorage.setItem('current_workflow_name', name);
+          setDesignerTitle(name);
+        });
+      };
+
+      if (hasCanvas) {
+        setTimeout(() => {
+          loadWorkflowState(JSON.parse(canvasJson!));
+          const savedName = localStorage.getItem('current_workflow_name');
+          if (savedName) {
+            setDesignerTitle(savedName);
+          } else {
+            autoName();
           }
-        } catch { /* ignore malformed data */ }
+        }, 200);
+      } else {
+        autoName();
       }
     }
+
+    // Editable title — save on blur or Enter
+    setTimeout(() => {
+      const titleEl = document.querySelector('.workflow-title') as HTMLElement | null;
+      if (!titleEl || titleEl.hasAttribute('data-title-wired')) return;
+      titleEl.setAttribute('data-title-wired', 'true');
+
+      const save = async () => {
+        const newName = titleEl.textContent?.trim() || 'Untitled Workflow';
+        if (!titleEl.textContent?.trim()) titleEl.textContent = newName;
+        localStorage.setItem('current_workflow_name', newName);
+        const wfId = localStorage.getItem('current_workflow_id');
+        if (wfId) await apiService.updateWorkflow(parseInt(wfId), { name: newName });
+      };
+
+      titleEl.addEventListener('blur', save);
+      titleEl.addEventListener('keydown', (e: KeyboardEvent) => {
+        if (e.key === 'Enter') { e.preventDefault(); titleEl.blur(); }
+        if (e.key === 'Escape') {
+          titleEl.textContent = localStorage.getItem('current_workflow_name') || 'Untitled Workflow';
+          titleEl.blur();
+        }
+      });
+    }, 300);
   }
 
   // Initialize AWS Signup form if it exists in DOM
@@ -232,11 +363,21 @@ function onRouteChange(): void {
     deploymentInitialized = true;
     initDeployment();
   }
+
+  if (document.getElementById('awsConnectForm')) {
+    initAWSConnect();
+  }
+
+  if (document.getElementById('deploymentsContainer')) {
+    initDeploymentsList();
+  }
 }
 
 const appEl = document.getElementById('app');
 if (appEl) {
   new MutationObserver(onRouteChange).observe(appEl, { childList: true });
+  // Initial render fires before observer is wired — run once manually
+  onRouteChange();
 }
 
 // ─── AWS Signup form helpers ──────────────────────────────────────────────────
@@ -292,6 +433,13 @@ setInterval(() => {
   const awsForm = document.getElementById('awsSignupForm');
   if (awsForm && !awsForm.hasAttribute('data-initialized')) {
     initAwsSignupForm();
+  }
+}, 250);
+
+setInterval(() => {
+  const connectForm = document.getElementById('awsConnectForm');
+  if (connectForm && !connectForm.hasAttribute('data-initialized')) {
+    initAWSConnect();
   }
 }, 250);
 
@@ -475,4 +623,254 @@ document.addEventListener('submit', async (e) => {
       submitBtn.innerHTML = originalBtnContent;
     });
   }
+
+  // ── AWS Connect form ──────────────────────────────────────────────────────────
+  if (form.id === 'awsConnectForm') {
+    e.preventDefault();
+    const methodEl = form.querySelector('input[name="authMethod"]:checked') as HTMLInputElement;
+    const method   = (methodEl?.value || 'assume_role') as 'access_key' | 'assume_role';
+    const region   = (document.getElementById('awsRegion') as HTMLSelectElement)?.value;
+    const feedback  = document.getElementById('awsConnectFeedback');
+    const submitBtn = document.getElementById('awsConnectSubmit') as HTMLButtonElement;
+
+    const showFeedback = (msg: string, isError: boolean) => {
+      if (!feedback) return;
+      feedback.style.display = 'block';
+      feedback.className = `aws-connect-feedback ${isError ? 'aws-connect-feedback-error' : 'aws-connect-feedback-success'}`;
+      feedback.textContent = msg;
+    };
+
+    let payload: Parameters<typeof apiService.connectAWS>[0] = { auth_method: method, region };
+
+    if (method === 'access_key') {
+      const accessKey = (document.getElementById('awsAccessKey') as HTMLInputElement)?.value.trim();
+      const secretKey = (document.getElementById('awsSecretKey') as HTMLInputElement)?.value.trim();
+      if (!accessKey || !secretKey) { showFeedback('Access Key ID and Secret Access Key are required.', true); return; }
+      payload = { ...payload, access_key: accessKey, secret_key: secretKey };
+    } else {
+      const roleArn    = (document.getElementById('awsRoleArn')    as HTMLInputElement)?.value.trim();
+      const externalId = (document.getElementById('awsExternalId') as HTMLInputElement)?.value.trim();
+      if (!roleArn) { showFeedback('IAM Role ARN is required.', true); return; }
+      if (!roleArn.startsWith('arn:aws:iam::')) { showFeedback('Invalid Role ARN format. Must start with arn:aws:iam::', true); return; }
+      payload = { ...payload, role_arn: roleArn, external_id: externalId || undefined };
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Connecting...';
+    if (feedback) feedback.style.display = 'none';
+
+    const result = await apiService.connectAWS(payload);
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Connect AWS Account';
+
+    if (result.error) {
+      showFeedback(`Connection failed: ${result.error}`, true);
+      return;
+    }
+
+    localStorage.setItem('aws_connected', 'true');
+    localStorage.setItem('aws_region', result.data?.region || region);
+
+    const banner  = document.getElementById('awsStatusBanner');
+    const bannerTxt = document.getElementById('awsStatusText');
+    if (banner && bannerTxt) {
+      banner.className = 'aws-status-banner aws-status-connected';
+      bannerTxt.textContent = `Connected · ${result.data?.auth_method === 'assume_role' ? 'IAM Role' : 'Access Keys'} · ${result.data?.region}`;
+    }
+    showFeedback('AWS account connected successfully!', false);
+  }
 });
+
+// ─── AWS Connect page init ────────────────────────────────────────────────────
+
+async function initAWSConnect(): Promise<void> {
+  const connectForm = document.getElementById('awsConnectForm');
+  if (!connectForm) return;
+  if (connectForm.hasAttribute('data-initialized')) return;
+  connectForm.setAttribute('data-initialized', 'true');
+
+  // External ID is fetched from backend (permanent per-user, generated on registration)
+  // Will be populated after getAWSStatus() resolves below
+
+  // Radio card toggling
+  const radios = document.querySelectorAll<HTMLInputElement>('input[name="authMethod"]');
+  const toggleSections = (method: string) => {
+    const accessKeySection  = document.getElementById('accessKeySection');
+    const assumeRoleSection = document.getElementById('assumeRoleSection');
+    if (accessKeySection) {
+      const show = method === 'access_key';
+      accessKeySection.style.display = show ? 'block' : 'none';
+      accessKeySection.classList.toggle('active', show);
+    }
+    if (assumeRoleSection) {
+      const show = method === 'assume_role';
+      assumeRoleSection.style.display = show ? 'block' : 'none';
+      assumeRoleSection.classList.toggle('active', show);
+    }
+  };
+  radios.forEach(r => r.addEventListener('change', () => toggleSections(r.value)));
+  // Set initial state from checked radio
+  const checkedRadio = document.querySelector<HTMLInputElement>('input[name="authMethod"]:checked');
+  if (checkedRadio) toggleSections(checkedRadio.value);
+
+  // Password toggle
+  document.getElementById('awsSecretToggle')?.addEventListener('click', () => {
+    const input = document.getElementById('awsSecretKey') as HTMLInputElement;
+    if (input) input.type = input.type === 'password' ? 'text' : 'password';
+  });
+
+  const banner    = document.getElementById('awsStatusBanner');
+  const bannerTxt = document.getElementById('awsStatusText');
+  const regionSel = document.getElementById('awsRegion') as HTMLSelectElement;
+
+  const status = await apiService.getAWSStatus();
+  if (!banner || !bannerTxt) return;
+
+  // Populate permanent external ID from backend
+  const extIdDisplay = document.getElementById('displayExternalId');
+  const extIdHidden  = document.getElementById('awsExternalId') as HTMLInputElement | null;
+  if (status.data?.external_id) {
+    if (extIdDisplay) extIdDisplay.textContent = status.data.external_id;
+    if (extIdHidden)  extIdHidden.value = status.data.external_id;
+  }
+
+  if (status.data?.connected) {
+    banner.className = 'aws-status-banner aws-status-connected';
+    const method = status.data.auth_method === 'assume_role' ? 'IAM Role' : 'Access Keys';
+    bannerTxt.textContent = `Connected · ${method} · ${status.data.region}`;
+    if (regionSel && status.data.region) regionSel.value = status.data.region;
+    // Pre-select the radio matching saved auth method
+    const matchingRadio = document.querySelector<HTMLInputElement>(`input[name="authMethod"][value="${status.data.auth_method}"]`);
+    if (matchingRadio) { matchingRadio.checked = true; toggleSections(status.data.auth_method); }
+  } else {
+    banner.className = 'aws-status-banner aws-status-disconnected';
+    bannerTxt.textContent = 'Not connected — enter credentials below to connect';
+  }
+}
+
+// ─── Deployments list ─────────────────────────────────────────────────────────
+
+const API_BASE_DEPLOY = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+function deplAuthHeaders(): Record<string, string> {
+  const token = localStorage.getItem('auth_token');
+  return token
+    ? { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+    : { 'Content-Type': 'application/json' };
+}
+
+function deplStatusClass(status: string): string {
+  if (status === 'succeeded') return 'success';
+  if (status === 'failed') return 'error';
+  if (status === 'destroyed') return 'destroyed';
+  return 'warning';
+}
+
+async function initDeploymentsList(): Promise<void> {
+  const container = document.getElementById('deploymentsContainer');
+  if (!container) return;
+
+  const render = async () => {
+    container.innerHTML = '<div class="deployments-loading">Loading deployments...</div>';
+    const token = localStorage.getItem('auth_token');
+    if (!token) {
+      container.innerHTML = '<div class="deployments-empty">Not logged in.</div>';
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE_DEPLOY}/api/deploy/`, { headers: deplAuthHeaders() });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const deployments: any[] = await res.json();
+
+      if (deployments.length === 0) {
+        container.innerHTML = `
+          <div class="deployments-empty">
+            <svg viewBox="0 0 24 24" fill="none" width="48" height="48" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <p>No deployments yet.</p>
+            <a href="/workflow" data-navigate="/workflow" class="btn btn-primary">Go to Designer</a>
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = `
+        <table class="deployments-table">
+          <thead>
+            <tr>
+              <th>Workflow</th>
+              <th>Status</th>
+              <th>Started</th>
+              <th>Resources</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${deployments.map(d => `
+              <tr data-deployment-id="${d.id}">
+                <td class="depl-name">${d.workflow_name || '—'}</td>
+                <td><span class="status-badge ${deplStatusClass(d.status)}">${d.status}</span></td>
+                <td class="depl-time">${d.started_at ? new Date(d.started_at).toLocaleString() : '—'}</td>
+                <td>${d.resource_count != null ? d.resource_count : '—'}</td>
+                <td class="depl-actions">
+                  <button class="btn btn-sm btn-outline depl-view-btn" data-id="${d.id}">View Logs</button>
+                  ${d.status === 'succeeded'
+                    ? `<button class="btn btn-sm btn-danger depl-destroy-btn" data-id="${d.id}">Destroy</button>`
+                    : ''}
+                </td>
+              </tr>`).join('')}
+          </tbody>
+        </table>`;
+    } catch (e) {
+      container.innerHTML = `<div class="deployments-empty">Failed to load deployments: ${e}</div>`;
+    }
+  };
+
+  await render();
+
+  // Refresh button
+  document.getElementById('refreshDeploymentsBtn')?.addEventListener('click', render);
+
+  // Event delegation for View / Destroy buttons
+  container.addEventListener('click', async (e) => {
+    const target = e.target as HTMLElement;
+
+    if (target.classList.contains('depl-view-btn')) {
+      const id = target.dataset.id;
+      if (id) { const { router } = await import('./router'); router.navigate(`/deployment?id=${id}`); }
+    }
+
+    if (target.classList.contains('depl-destroy-btn')) {
+      const id = target.dataset.id;
+      if (!id) return;
+      if (!confirm('Destroy all AWS resources from this deployment? This cannot be undone.')) return;
+
+      target.setAttribute('disabled', 'true');
+      target.textContent = 'Destroying...';
+
+      try {
+        const res = await fetch(`${API_BASE_DEPLOY}/api/deploy/${id}/destroy`, {
+          method: 'POST',
+          headers: deplAuthHeaders(),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ detail: 'Unknown error' }));
+          alert(`Destroy failed: ${err.detail}`);
+          target.removeAttribute('disabled');
+          target.textContent = 'Destroy';
+          return;
+        }
+        // Navigate to detail page to watch destroy logs
+        const { router } = await import('./router');
+        router.navigate(`/deployment?id=${id}`);
+      } catch (err) {
+        alert(`Network error: ${err}`);
+        target.removeAttribute('disabled');
+        target.textContent = 'Destroy';
+      }
+    }
+  });
+}
