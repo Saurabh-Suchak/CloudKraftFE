@@ -1886,15 +1886,15 @@ function setupWorkflowActions(): void {
         if (result.error) { alert(`Save failed: ${result.error}`); return; }
         alert('Workflow updated successfully!');
       } else {
-        const name = prompt('Enter workflow name:');
-        if (!name) return;
-        const description = prompt('Enter workflow description (optional):') || '';
-        const result = await apiService.createWorkflow(name, description, workflowState);
+        const titleEl = document.querySelector('.workflow-title') as HTMLElement | null;
+        const name = titleEl?.textContent?.trim()
+          || localStorage.getItem('current_workflow_name')
+          || `Workflow ${Date.now()}`;
+        const result = await apiService.createWorkflow(name, '', workflowState);
         if (result.error) { alert(`Save failed: ${result.error}`); return; }
         if (result.data) {
           localStorage.setItem('current_workflow_id', String(result.data.id));
           localStorage.setItem('current_workflow_name', name);
-          const titleEl = document.querySelector('.workflow-title');
           if (titleEl) titleEl.textContent = name;
         }
         alert('Workflow saved successfully!');
@@ -1915,7 +1915,7 @@ function setupWorkflowActions(): void {
         localStorage.setItem('canvas_state', JSON.stringify(workflowState));
         localStorage.setItem('generated_terraform', result.data.terraform_code);
         localStorage.setItem('generated_terraform_files', JSON.stringify(result.data.files));
-        localStorage.setItem('deployment_workflow_name', workflowState.metadata?.name || 'Unnamed Workflow');
+        localStorage.setItem('deployment_workflow_name', localStorage.getItem('current_workflow_name') || (document.querySelector('.workflow-title') as HTMLElement)?.textContent?.trim() || 'Workflow');
         localStorage.setItem('deployment_node_count', String(workflowState.nodes.length));
         router.navigate('/deployment');
       }
