@@ -1,36 +1,77 @@
-// Deployment page logic
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
-interface TerraformFile {
-  filename: string;
-  content: string;
+interface TerraformFile { filename: string; content: string; }
+interface LogItem { id: number; level: string; message: string; timestamp: string; }
+
+let _pollTimer: ReturnType<typeof setInterval> | null = null;
+
+function stopPolling(): void {
+  if (_pollTimer !== null) { clearInterval(_pollTimer); _pollTimer = null; }
+}
+
+function authHeaders(): Record<string, string> {
+  const token = localStorage.getItem('auth_token');
+  return token ? { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' };
+}
+
+function addLog(logsEl: HTMLElement, message: string, level = 'info'): void {
+  const ts = new Date().toLocaleTimeString();
+  const entry = document.createElement('div');
+  entry.className = `log-entry${level !== 'info' ? ` ${level}` : ''}`;
+  entry.innerHTML = `<span class="log-time">[${ts}]</span> <span class="log-message">${escHtml(message)}</span>`;
+  logsEl.appendChild(entry);
+  logsEl.scrollTop = logsEl.scrollHeight;
+}
+
+function setStatus(text: string, type: 'info' | 'success' | 'error' | 'warning'): void {
+  const badge = document.getElementById('deploymentStatusBadge');
+  const textEl = document.getElementById('deploymentStatusText');
+  const summaryStatus = document.getElementById('summaryStatus');
+  if (badge) badge.className = `status-badge ${type === 'info' ? 'warning' : type}`;
+  if (textEl) textEl.textContent = text;
+  if (summaryStatus) summaryStatus.textContent = text;
+}
+
+function escHtml(str: string): string {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function showDestroyBtn(deploymentId: number): void {
+  const actions = document.querySelector('.deployment-actions');
+  if (!actions || document.getElementById('destroyBtn')) return;
+  const btn = document.createElement('button');
+  btn.id = 'destroyBtn';
+  btn.className = 'btn btn-outline';
+  btn.style.color = '#ef4444';
+  btn.style.borderColor = '#ef4444';
+  btn.textContent = 'Destroy Resources';
+  btn.addEventListener('click', () => runDestroy(deploymentId));
+  actions.insertBefore(btn, actions.firstChild);
 }
 
 export function initDeployment(): void {
-  const workflowName  = localStorage.getItem('deployment_workflow_name') || 'Unnamed Workflow';
-  const nodeCount     = localStorage.getItem('deployment_node_count') || '0';
-  const filesJson     = localStorage.getItem('generated_terraform_files');
+  stopPolling();
+
+  const workflowName = localStorage.getItem('deployment_workflow_name') || 'Unnamed Workflow';
+  const filesJson    = localStorage.getItem('generated_terraform_files');
+  const token        = localStorage.getItem('auth_token');
 
   let files: TerraformFile[] = [];
   try { if (filesJson) files = JSON.parse(filesJson); } catch { /* ignore */ }
 
-  // Populate header
   const nameEl = document.getElementById('deploymentWorkflowName');
   if (nameEl) nameEl.textContent = workflowName;
 
   const timeEl = document.getElementById('deploymentTime');
   if (timeEl) timeEl.textContent = new Date().toLocaleString();
 
-  // Populate summary
-  const summaryStatus    = document.getElementById('summaryStatus');
   const summaryNodeCount = document.getElementById('summaryNodeCount');
   const summaryFileCount = document.getElementById('summaryFileCount');
   const summaryStartedAt = document.getElementById('summaryStartedAt');
-  if (summaryStatus)    summaryStatus.textContent    = 'Ready';
-  if (summaryNodeCount) summaryNodeCount.textContent = nodeCount;
+  if (summaryNodeCount) summaryNodeCount.textContent = localStorage.getItem('deployment_node_count') || '—';
   if (summaryFileCount) summaryFileCount.textContent = String(files.length);
   if (summaryStartedAt) summaryStartedAt.textContent = '—';
 
-  // List generated files
   const filesEl = document.getElementById('deploymentFiles');
   if (filesEl && files.length > 0) {
     filesEl.innerHTML = `
@@ -42,100 +83,184 @@ export function initDeployment(): void {
               stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             <path d="M14 2V8H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
-          ${f.filename}
+          ${escHtml(f.filename)}
         </li>`).join('')}
       </ul>`;
   }
 
-  // If no files were generated, show a prompt
-  if (files.length === 0) {
-    const logsEl = document.getElementById('deploymentLogs');
-    if (logsEl) {
-      logsEl.innerHTML = `<div class="log-entry warning">
-        <span class="log-message">No generated files found. Go to the Workflow Designer and click "Generate Code" first.</span>
-      </div>`;
-    }
-    const startBtn = document.getElementById('startDeployBtn') as HTMLButtonElement | null;
+  const logsEl = document.getElementById('deploymentLogs');
+  const startBtn = document.getElementById('startDeployBtn') as HTMLButtonElement | null;
+
+  // No auth — block deploy
+  if (!token) {
+    if (logsEl) logsEl.innerHTML = '<div class="log-entry error"><span class="log-message">Not logged in. Please log in first.</span></div>';
+    if (startBtn) startBtn.disabled = true;
+    setStatus('Not authenticated', 'error');
+    document.getElementById('backToCodeBtn')?.addEventListener('click', async () => {
+      const { router } = await import('./router');
+      router.navigate('/login');
+    });
+    return;
+  }
+
+  // No canvas state — block deploy
+  const canvasStateJson = localStorage.getItem('canvas_state');
+  if (!canvasStateJson || files.length === 0) {
+    if (logsEl) logsEl.innerHTML = '<div class="log-entry warning"><span class="log-message">No workflow found. Go to Workflow Designer and generate code first.</span></div>';
     if (startBtn) startBtn.disabled = true;
   }
 
-  // Back to Code
   document.getElementById('backToCodeBtn')?.addEventListener('click', async () => {
     const { router } = await import('./router');
     router.navigate('/code');
   });
 
-  // Run Deployment — simulates terraform apply steps
-  document.getElementById('startDeployBtn')?.addEventListener('click', () => runDeployment(files, nodeCount));
+  startBtn?.addEventListener('click', () => {
+    const canvas = localStorage.getItem('canvas_state');
+    if (!canvas) { alert('No workflow state found. Generate code from the designer first.'); return; }
+    let workflowState: any;
+    try { workflowState = JSON.parse(canvas); } catch { alert('Invalid workflow state.'); return; }
+    runDeploy(workflowState, workflowName);
+  });
+
+  setStatus('Ready', 'info');
 }
 
-function addLog(logsEl: HTMLElement, message: string, type: 'info' | 'success' | 'error' | 'warning' = 'info'): void {
-  const ts = new Date().toLocaleTimeString();
-  const entry = document.createElement('div');
-  entry.className = `log-entry${type !== 'info' ? ` ${type}` : ''}`;
-  entry.innerHTML = `<span class="log-time">[${ts}]</span> <span class="log-message">${message}</span>`;
-  logsEl.appendChild(entry);
-  logsEl.scrollTop = logsEl.scrollHeight;
-}
-
-function setStatus(text: string, type: 'info' | 'success' | 'error' | 'warning'): void {
-  const badge = document.getElementById('deploymentStatusBadge');
-  const textEl = document.getElementById('deploymentStatusText');
-  const summaryStatus = document.getElementById('summaryStatus');
-  if (badge) {
-    badge.className = `status-badge ${type === 'info' ? 'warning' : type}`;
-  }
-  if (textEl) textEl.textContent = text;
-  if (summaryStatus) summaryStatus.textContent = text;
-}
-
-async function runDeployment(files: TerraformFile[], nodeCount: string): Promise<void> {
+async function runDeploy(workflowState: any, workflowName: string): Promise<void> {
   const logsEl = document.getElementById('deploymentLogs');
   const startBtn = document.getElementById('startDeployBtn') as HTMLButtonElement | null;
   const summaryStartedAt = document.getElementById('summaryStartedAt');
-
   if (!logsEl) return;
 
-  if (startBtn) startBtn.disabled = true;
+  stopPolling();
   logsEl.innerHTML = '';
+  if (startBtn) startBtn.disabled = true;
   if (summaryStartedAt) summaryStartedAt.textContent = new Date().toLocaleString();
-
   setStatus('Deploying...', 'info');
+  addLog(logsEl, 'Submitting deployment to backend...');
 
-  const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
-
-  addLog(logsEl, 'Initializing Terraform...');
-  await delay(800);
-
-  addLog(logsEl, `Loading ${files.length} configuration file(s)...`);
-  await delay(600);
-
-  for (const file of files) {
-    addLog(logsEl, `  ✓ ${file.filename} (${file.content.split('\n').length} lines)`);
-    await delay(200);
+  let deploymentId: number;
+  try {
+    const res = await fetch(`${API_BASE}/api/deploy/apply`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ workflow: workflowState, workflow_name: workflowName }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Unknown error' }));
+      addLog(logsEl, `Failed to start deployment: ${err.detail || res.status}`, 'error');
+      setStatus('Failed', 'error');
+      if (startBtn) startBtn.disabled = false;
+      return;
+    }
+    const data = await res.json();
+    deploymentId = data.id;
+    addLog(logsEl, `Deployment #${deploymentId} queued`);
+  } catch (e) {
+    addLog(logsEl, `Network error: ${e}`, 'error');
+    setStatus('Failed', 'error');
+    if (startBtn) startBtn.disabled = false;
+    return;
   }
 
-  addLog(logsEl, 'Running terraform init...');
-  await delay(1000);
-  addLog(logsEl, '  ✓ Provider plugins initialized');
-  await delay(400);
+  let lastLogId = 0;
+  const TERMINAL = new Set(['succeeded', 'failed', 'destroyed']);
 
-  addLog(logsEl, 'Running terraform plan...');
-  await delay(1200);
-  addLog(logsEl, `  ✓ Plan: ${nodeCount} resource(s) to add, 0 to change, 0 to destroy`);
-  await delay(400);
+  _pollTimer = setInterval(async () => {
+    try {
+      const res = await fetch(
+        `${API_BASE}/api/deploy/${deploymentId}/logs?after_id=${lastLogId}`,
+        { headers: authHeaders() }
+      );
+      if (!res.ok) return;
+      const data: { logs: LogItem[]; deployment_status: string } = await res.json();
 
-  addLog(logsEl, 'Running terraform apply...');
-  await delay(1500);
+      for (const log of data.logs) {
+        addLog(logsEl, log.message, log.level as any);
+        lastLogId = log.id;
+      }
 
-  addLog(logsEl, `  ✓ ${nodeCount} resource(s) created successfully`, 'success');
-  await delay(300);
+      if (TERMINAL.has(data.deployment_status)) {
+        stopPolling();
+        if (data.deployment_status === 'succeeded') {
+          setStatus('Succeeded', 'success');
+          showDestroyBtn(deploymentId);
+          const nodeCount = document.getElementById('summaryNodeCount');
+          const resCountRes = await fetch(`${API_BASE}/api/deploy/${deploymentId}`, { headers: authHeaders() });
+          if (resCountRes.ok) {
+            const dep = await resCountRes.json();
+            if (dep.resource_count != null && nodeCount) nodeCount.textContent = String(dep.resource_count);
+          }
+        } else if (data.deployment_status === 'failed') {
+          setStatus('Failed', 'error');
+          if (startBtn) { startBtn.disabled = false; startBtn.textContent = 'Retry Deployment'; }
+        } else {
+          setStatus('Destroyed', 'warning');
+        }
+      }
+    } catch { /* network hiccup — keep polling */ }
+  }, 2000);
+}
 
-  addLog(logsEl, 'Deployment complete.', 'success');
-  setStatus('Succeeded', 'success');
+async function runDestroy(deploymentId: number): Promise<void> {
+  if (!confirm('This will destroy all AWS resources created by this deployment. Continue?')) return;
 
-  if (startBtn) {
-    startBtn.disabled = false;
-    startBtn.textContent = 'Re-run Deployment';
+  const logsEl = document.getElementById('deploymentLogs');
+  const destroyBtn = document.getElementById('destroyBtn') as HTMLButtonElement | null;
+  if (!logsEl) return;
+
+  stopPolling();
+  if (destroyBtn) destroyBtn.disabled = true;
+  setStatus('Destroying...', 'warning');
+  addLog(logsEl, 'Submitting destroy request...');
+
+  try {
+    const res = await fetch(`${API_BASE}/api/deploy/${deploymentId}/destroy`, {
+      method: 'POST',
+      headers: authHeaders(),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Unknown error' }));
+      addLog(logsEl, `Destroy request failed: ${err.detail}`, 'error');
+      setStatus('Failed', 'error');
+      if (destroyBtn) destroyBtn.disabled = false;
+      return;
+    }
+    addLog(logsEl, 'Destroy job queued — streaming logs...');
+  } catch (e) {
+    addLog(logsEl, `Network error: ${e}`, 'error');
+    if (destroyBtn) destroyBtn.disabled = false;
+    return;
   }
+
+  let lastLogId = 0;
+  const TERMINAL = new Set(['succeeded', 'failed', 'destroyed']);
+
+  _pollTimer = setInterval(async () => {
+    try {
+      const res = await fetch(
+        `${API_BASE}/api/deploy/${deploymentId}/logs?after_id=${lastLogId}`,
+        { headers: authHeaders() }
+      );
+      if (!res.ok) return;
+      const data: { logs: LogItem[]; deployment_status: string } = await res.json();
+
+      for (const log of data.logs) {
+        addLog(logsEl, log.message, log.level as any);
+        lastLogId = log.id;
+      }
+
+      if (TERMINAL.has(data.deployment_status)) {
+        stopPolling();
+        if (data.deployment_status === 'destroyed') {
+          setStatus('Destroyed', 'warning');
+          if (destroyBtn) destroyBtn.remove();
+          addLog(logsEl, 'All resources destroyed.', 'success');
+        } else if (data.deployment_status === 'failed') {
+          setStatus('Failed', 'error');
+          if (destroyBtn) destroyBtn.disabled = false;
+        }
+      }
+    } catch { /* keep polling */ }
+  }, 2000);
 }
