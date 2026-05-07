@@ -100,7 +100,25 @@ export const AWSConnect = (): string => {
 
             <!-- Access Key Section -->
             <div id="accessKeySection" class="auth-section" style="display: none;">
-              <div class="form-group">
+              <div class="instructions-box">
+                <h4>Step 1: Ensure your IAM user has the required permissions</h4>
+                <p>The IAM user whose credentials you're providing must have sufficient permissions to create and manage AWS resources. Go to <strong>IAM → Users → your user → Add permissions → Attach policies</strong> and attach:</p>
+                <div class="info-block" style="background: var(--surface-100); padding: 12px; border-radius: 6px;">
+                  <p style="margin-bottom: 8px; font-size: 13px;"><strong>Option A — Easiest (recommended for dev/test):</strong></p>
+                  <p style="margin-bottom: 12px; font-size: 13px;">Attach <code class="code-span">AdministratorAccess</code></p>
+                  <p style="margin-bottom: 8px; font-size: 13px;"><strong>Option B — Least privilege (production):</strong></p>
+                  <ul style="margin: 8px 0 0 0; padding-left: 18px; font-size: 13px; color: var(--text-secondary); line-height: 1.8;">
+                    <li><code class="code-span">AmazonEC2FullAccess</code></li>
+                    <li><code class="code-span">AmazonS3FullAccess</code></li>
+                    <li><code class="code-span">AmazonDynamoDBFullAccess</code></li>
+                    <li><code class="code-span">AmazonSQSFullAccess</code></li>
+                    <li><code class="code-span">AWSLambda_FullAccess</code></li>
+                    <li><code class="code-span">IAMFullAccess</code></li>
+                  </ul>
+                </div>
+              </div>
+              <div class="form-group margin-top-1rem">
+                <h4>Step 2: Enter your credentials</h4>
                 <label for="awsAccessKey" class="form-label">AWS Access Key ID</label>
                 <input type="text" id="awsAccessKey" name="awsAccessKey" class="form-input" placeholder="AKIAIOSFODNN7EXAMPLE" autocomplete="off" />
                 <small class="form-hint">Your AWS Access Key ID</small>
@@ -149,8 +167,27 @@ export const AWSConnect = (): string => {
                 </div>
               </div>
 
+              <div class="instructions-box margin-top-1rem">
+                <h4>Step 2: Attach Permissions to the Role</h4>
+                <p>The role needs permissions to create and manage AWS resources on your behalf. In the role you just created, go to <strong>Add permissions → Attach policies</strong> and attach the following:</p>
+                <div class="info-block" style="background: var(--surface-100); padding: 12px; border-radius: 6px;">
+                  <p style="margin-bottom: 8px; font-size: 13px;"><strong>Option A — Easiest (recommended for dev/test):</strong></p>
+                  <p style="margin-bottom: 12px; font-size: 13px;">Attach <code class="code-span">AdministratorAccess</code></p>
+                  <p style="margin-bottom: 8px; font-size: 13px;"><strong>Option B — Least privilege (production):</strong></p>
+                  <p style="margin: 0; font-size: 13px;">Attach each policy you need:</p>
+                  <ul style="margin: 8px 0 0 0; padding-left: 18px; font-size: 13px; color: var(--text-secondary); line-height: 1.8;">
+                    <li><code class="code-span">AmazonEC2FullAccess</code></li>
+                    <li><code class="code-span">AmazonS3FullAccess</code></li>
+                    <li><code class="code-span">AmazonDynamoDBFullAccess</code></li>
+                    <li><code class="code-span">AmazonSQSFullAccess</code></li>
+                    <li><code class="code-span">AWSLambda_FullAccess</code></li>
+                    <li><code class="code-span">IAMFullAccess</code></li>
+                  </ul>
+                </div>
+              </div>
+
               <div class="form-group margin-top-1rem">
-                <h4>Step 2: Enter Role ARN</h4>
+                <h4>Step 3: Enter Role ARN</h4>
                 <p class="instructions-text">Open the role you just created, copy the ARN and paste below.</p>
                 <label for="awsRoleArn" class="form-label">Role ARN</label>
                 <input type="text" id="awsRoleArn" name="awsRoleArn" class="form-input" placeholder="arn:aws:iam::123456789012:role/CloudKraftRole" />
