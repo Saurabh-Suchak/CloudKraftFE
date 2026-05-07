@@ -67,18 +67,13 @@ export const AWSConnect = (): string => {
       <main class="aws-connect-main">
         <div class="aws-connect-card">
 
-          <div class="aws-connect-header">
-            <div class="aws-connect-logo">
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M20 16.2A4.5 4.5 0 0 0 17.5 8h-1.8A7 7 0 1 0 4 15" stroke="#FF9900" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M12 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0-2 0M12 13v4M10 19h4" stroke="#FF9900" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </div>
-            <div>
-              <h2 class="aws-connect-title">AWS Connection</h2>
-              <p class="aws-connect-subtitle">Connect your AWS account to enable deployments</p>
-            </div>
+          <div class="aws-header">
+            <svg class="aws-logo" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="#FF9900"/>
+            </svg>
+            <h1 class="login-title">Connect AWS Account</h1>
           </div>
+          <p class="login-subtitle">Link your AWS account to enable deployments from CloudKraft.</p>
 
           <!-- Dynamic status banner -->
           <div id="awsStatusBanner" class="aws-status-banner aws-status-loading">
@@ -86,96 +81,120 @@ export const AWSConnect = (): string => {
             <span id="awsStatusText">Checking connection...</span>
           </div>
 
-          <!-- Method toggle -->
-          <div class="aws-method-tabs">
-            <button class="aws-method-tab active" id="tabAccessKey" data-method="access_key">
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M21 2L19 4M15 8L6.5 16.5M11 11L13 13M9 17H7V19H5V21H2V18L7 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <circle cx="17" cy="7" r="4" stroke="currentColor" stroke-width="2"/>
-              </svg>
-              Access Keys
-            </button>
-            <button class="aws-method-tab" id="tabAssumeRole" data-method="assume_role">
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M20 7H4C2.9 7 2 7.9 2 9V19C2 20.1 2.9 21 4 21H20C21.1 21 22 20.1 22 19V9C22 7.9 21.1 7 20 7Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M16 3H8C7.4 3 7 3.4 7 4V7H17V4C17 3.4 16.6 3 16 3Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <circle cx="12" cy="14" r="2" stroke="currentColor" stroke-width="2"/>
-              </svg>
-              IAM Role
-            </button>
-          </div>
+          <form class="login-form" id="awsConnectForm">
 
-          <form class="aws-connect-form" id="awsConnectForm">
-            <input type="hidden" id="connectAuthMethod" value="access_key" />
+            <div class="auth-method-selector">
+              <label class="radio-card">
+                <input type="radio" name="authMethod" value="access_key">
+                <div class="radio-card-content">
+                  <span class="radio-title">Using Access Keys</span>
+                </div>
+              </label>
+              <label class="radio-card">
+                <input type="radio" name="authMethod" value="assume_role" checked>
+                <div class="radio-card-content">
+                  <span class="radio-title" style="white-space: nowrap;">Using Assume Role</span>
+                </div>
+              </label>
+            </div>
 
-            <!-- Access Key fields -->
-            <div id="accessKeyFields">
+            <!-- Access Key Section -->
+            <div id="accessKeySection" class="auth-section" style="display: none;">
               <div class="form-group">
-                <label class="form-label" for="connectAccessKey">Access Key ID</label>
-                <input type="text" id="connectAccessKey" class="form-input" placeholder="AKIAIOSFODNN7EXAMPLE" autocomplete="off" />
+                <label for="awsAccessKey" class="form-label">AWS Access Key ID</label>
+                <input type="text" id="awsAccessKey" name="awsAccessKey" class="form-input" placeholder="AKIAIOSFODNN7EXAMPLE" autocomplete="off" />
+                <small class="form-hint">Your AWS Access Key ID</small>
               </div>
               <div class="form-group">
-                <label class="form-label" for="connectSecretKey">Secret Access Key</label>
+                <label for="awsSecretKey" class="form-label">AWS Secret Access Key</label>
                 <div class="password-input-wrapper">
-                  <input type="password" id="connectSecretKey" class="form-input" placeholder="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" autocomplete="off" />
-                  <button type="button" class="password-toggle" id="connectSecretToggle">
+                  <input type="password" id="awsSecretKey" name="awsSecretKey" class="form-input" placeholder="Enter your AWS Secret Key" autocomplete="off" />
+                  <button type="button" class="password-toggle" id="awsSecretToggle">
                     <svg class="eye-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path d="M1 12S5 4 12 4S23 12 23 12S19 20 12 20S1 12 1 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                       <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
                     </svg>
                   </button>
                 </div>
+                <small class="form-hint">Your AWS Secret Access Key (keep this secure)</small>
               </div>
             </div>
 
-            <!-- IAM Role fields -->
-            <div id="assumeRoleFields" style="display:none;">
-              <div class="form-group">
-                <label class="form-label" for="connectRoleArn">IAM Role ARN</label>
-                <input type="text" id="connectRoleArn" class="form-input" placeholder="arn:aws:iam::123456789012:role/CloudKraftRole" />
+            <!-- Assume Role Section -->
+            <div id="assumeRoleSection" class="auth-section active">
+              <div class="instructions-box">
+                <h4>Step 1: Create an IAM Role for CloudKraft</h4>
+                <p>Create an IAM Role in your AWS account to enable CloudKraft to perform actions on your behalf.</p>
+                <div class="info-block" style="background: var(--surface-100); padding: 12px; border-radius: 6px; position: relative;">
+                  <p style="margin-bottom: 12px;"><strong>Enable Require external ID with:</strong> <span id="displayExternalId" class="code-span">Generating...</span></p>
+                  <p style="margin-bottom: 8px; font-size: 13px;"><strong>Custom Trust Policy:</strong></p>
+                  <pre style="margin: 0; font-family: monospace; font-size: 12px; color: var(--text-600); white-space: pre-wrap; word-break: break-all; background: var(--surface-200); padding: 10px; border-radius: 4px;">
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "AWS": "arn:aws:iam::059801127401:user/cloudkraft"
+            },
+            "Action": "sts:AssumeRole",
+            "Condition": {
+                "StringEquals": {
+                    "sts:ExternalId": "PUT THE EXTERNAL ID"
+                }
+            }
+        }
+    ]
+}</pre>
+                </div>
               </div>
-              <div class="form-group">
-                <label class="form-label" for="connectExternalId">
-                  External ID
-                  <span class="form-hint-inline">(optional)</span>
-                </label>
-                <input type="text" id="connectExternalId" class="form-input" placeholder="my-external-id" />
-              </div>
-              <div class="aws-role-info">
-                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
-                  <path d="M12 8v4M12 16h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                </svg>
-                The backend must have its own AWS credentials to assume this role. Add <code>BACKEND_AWS_ACCESS_KEY</code> and <code>BACKEND_AWS_SECRET_KEY</code> to the server <code>.env</code>.
+
+              <div class="form-group margin-top-1rem">
+                <h4>Step 2: Enter Role ARN</h4>
+                <p class="instructions-text">Open the role you just created, copy the ARN and paste below.</p>
+                <label for="awsRoleArn" class="form-label">Role ARN</label>
+                <input type="text" id="awsRoleArn" name="awsRoleArn" class="form-input" placeholder="arn:aws:iam::123456789012:role/CloudKraftRole" />
+                <input type="hidden" id="awsExternalId" name="awsExternalId" />
               </div>
             </div>
 
-            <!-- Region (always shown) -->
+            <!-- Region -->
             <div class="form-group">
-              <label class="form-label" for="connectRegion">AWS Region</label>
-              <select id="connectRegion" class="form-input">
-                <option value="us-east-1">us-east-1 — N. Virginia</option>
-                <option value="us-east-2">us-east-2 — Ohio</option>
-                <option value="us-west-1">us-west-1 — N. California</option>
-                <option value="us-west-2">us-west-2 — Oregon</option>
-                <option value="ap-south-1">ap-south-1 — Mumbai</option>
-                <option value="ap-northeast-1">ap-northeast-1 — Tokyo</option>
-                <option value="ap-southeast-1">ap-southeast-1 — Singapore</option>
-                <option value="ap-southeast-2">ap-southeast-2 — Sydney</option>
-                <option value="eu-central-1">eu-central-1 — Frankfurt</option>
-                <option value="eu-west-1">eu-west-1 — Ireland</option>
-                <option value="eu-west-2">eu-west-2 — London</option>
-                <option value="ca-central-1">ca-central-1 — Canada</option>
-                <option value="sa-east-1">sa-east-1 — São Paulo</option>
+              <label for="awsRegion" class="form-label">AWS Region</label>
+              <select id="awsRegion" name="awsRegion" class="form-input" required>
+                <option value="">Select a region</option>
+                <option value="us-east-1">US East (N. Virginia) - us-east-1</option>
+                <option value="us-east-2">US East (Ohio) - us-east-2</option>
+                <option value="us-west-1">US West (N. California) - us-west-1</option>
+                <option value="us-west-2">US West (Oregon) - us-west-2</option>
+                <option value="eu-west-1">Europe (Ireland) - eu-west-1</option>
+                <option value="eu-west-2">Europe (London) - eu-west-2</option>
+                <option value="eu-central-1">Europe (Frankfurt) - eu-central-1</option>
+                <option value="ap-southeast-1">Asia Pacific (Singapore) - ap-southeast-1</option>
+                <option value="ap-southeast-2">Asia Pacific (Sydney) - ap-southeast-2</option>
+                <option value="ap-northeast-1">Asia Pacific (Tokyo) - ap-northeast-1</option>
               </select>
             </div>
 
             <div id="awsConnectFeedback" class="aws-connect-feedback" style="display:none;"></div>
 
-            <button type="submit" class="btn btn-primary btn-full aws-connect-submit" id="awsConnectSubmit">
+            <button type="submit" class="btn btn-primary btn-full" id="awsConnectSubmit">
+              <svg class="aws-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="currentColor"/>
+              </svg>
               Connect AWS Account
             </button>
           </form>
+
+          <div class="aws-info-box">
+            <h4 class="info-title">About AWS Integration</h4>
+            <ul class="info-list">
+              <li>Your AWS credentials are encrypted and stored securely</li>
+              <li>CloudKraft uses IAM roles and policies for secure access</li>
+              <li>You can revoke access at any time from your AWS console</li>
+              <li>We recommend using IAM roles with limited permissions</li>
+            </ul>
+          </div>
 
         </div>
       </main>
