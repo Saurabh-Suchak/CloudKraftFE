@@ -102,12 +102,13 @@ export const Dashboard = (): string => {
                 <tr>
                   <th>PROJECT NAME</th>
                   <th>LAST MODIFIED</th>
+                  <th>STATUS</th>
                   <th>ACTIONS</th>
                 </tr>
               </thead>
               <tbody id="workflowsTableBody">
                 <tr>
-                  <td colspan="3" class="table-loading">Loading projects...</td>
+                  <td colspan="4" class="table-loading">Loading projects...</td>
                 </tr>
               </tbody>
             </table>
