@@ -52,6 +52,13 @@ function showDestroyBtn(deploymentId: number): void {
 export function initDeployment(): void {
   stopPolling();
 
+  // If ?id= param present — view existing deployment, don't start new one
+  const existingId = new URLSearchParams(window.location.search).get('id');
+  if (existingId) {
+    loadExistingDeployment(parseInt(existingId, 10));
+    return;
+  }
+
   const workflowName = localStorage.getItem('deployment_workflow_name') || 'Unnamed Workflow';
   const filesJson    = localStorage.getItem('generated_terraform_files');
   const token        = localStorage.getItem('auth_token');
@@ -200,6 +207,70 @@ async function runDeploy(workflowState: any, workflowName: string): Promise<void
       }
     } catch { /* network hiccup — keep polling */ }
   }, 2000);
+}
+
+async function loadExistingDeployment(deploymentId: number): Promise<void> {
+  const logsEl = document.getElementById('deploymentLogs');
+  const startBtn = document.getElementById('startDeployBtn') as HTMLButtonElement | null;
+  if (!logsEl) return;
+
+  if (startBtn) { startBtn.style.display = 'none'; }
+  document.getElementById('backToCodeBtn')?.addEventListener('click', async () => {
+    const { router } = await import('./router');
+    router.navigate('/deployments');
+  });
+
+  try {
+    const res = await fetch(`${API_BASE}/api/deploy/${deploymentId}`, { headers: authHeaders() });
+    if (!res.ok) { addLog(logsEl, 'Could not load deployment.', 'error'); return; }
+    const dep = await res.json();
+
+    const nameEl = document.getElementById('deploymentWorkflowName');
+    if (nameEl) nameEl.textContent = dep.workflow_name || 'Deployment';
+    const timeEl = document.getElementById('deploymentTime');
+    if (timeEl) timeEl.textContent = dep.started_at ? new Date(dep.started_at).toLocaleString() : '—';
+    const summaryNodeCount = document.getElementById('summaryNodeCount');
+    if (summaryNodeCount) summaryNodeCount.textContent = dep.resource_count != null ? String(dep.resource_count) : '—';
+    const summaryStartedAt = document.getElementById('summaryStartedAt');
+    if (summaryStartedAt) summaryStartedAt.textContent = dep.started_at ? new Date(dep.started_at).toLocaleString() : '—';
+
+    const TERMINAL = new Set(['succeeded', 'failed', 'destroyed']);
+    const POLL_STATUSES = new Set(['pending', 'running', 'destroying']);
+
+    if (!POLL_STATUSES.has(dep.status) && TERMINAL.has(dep.status)) {
+      // Load all logs once then stop
+      const logRes = await fetch(`${API_BASE}/api/deploy/${deploymentId}/logs?after_id=0`, { headers: authHeaders() });
+      if (logRes.ok) {
+        logsEl.innerHTML = '';
+        const logData: { logs: LogItem[]; deployment_status: string } = await logRes.json();
+        for (const log of logData.logs) addLog(logsEl, log.message, log.level as any);
+      }
+      if (dep.status === 'succeeded') { setStatus('Succeeded', 'success'); showDestroyBtn(deploymentId); }
+      else if (dep.status === 'failed') { setStatus('Failed', 'error'); }
+      else { setStatus('Destroyed', 'warning'); }
+    } else {
+      // Still running — poll from 0
+      setStatus('Deploying...', 'info');
+      logsEl.innerHTML = '';
+      let lastLogId = 0;
+      _pollTimer = setInterval(async () => {
+        try {
+          const r = await fetch(`${API_BASE}/api/deploy/${deploymentId}/logs?after_id=${lastLogId}`, { headers: authHeaders() });
+          if (!r.ok) return;
+          const data: { logs: LogItem[]; deployment_status: string } = await r.json();
+          for (const log of data.logs) { addLog(logsEl, log.message, log.level as any); lastLogId = log.id; }
+          if (TERMINAL.has(data.deployment_status)) {
+            stopPolling();
+            if (data.deployment_status === 'succeeded') { setStatus('Succeeded', 'success'); showDestroyBtn(deploymentId); }
+            else if (data.deployment_status === 'failed') { setStatus('Failed', 'error'); }
+            else { setStatus('Destroyed', 'warning'); }
+          }
+        } catch { /* keep polling */ }
+      }, 2000);
+    }
+  } catch (e) {
+    addLog(logsEl, `Error loading deployment: ${e}`, 'error');
+  }
 }
 
 async function runDestroy(deploymentId: number): Promise<void> {
