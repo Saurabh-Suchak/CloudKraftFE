@@ -19,7 +19,7 @@ class Router {
     
     // Set up popstate listener for browser back/forward
     window.addEventListener('popstate', () => {
-      this.currentPath = window.location.pathname;
+      this.currentPath = window.location.pathname + window.location.search;
       this.render();
     });
     
@@ -57,7 +57,8 @@ class Router {
   }
 
   private render(): void {
-    const route = this.routes.find(r => r.path === this.currentPath) || 
+    const pathname = this.currentPath.split('?')[0];
+    const route = this.routes.find(r => r.path === pathname) ||
                   this.routes.find(r => r.path === '*');
     
     const app = document.querySelector('#app');
