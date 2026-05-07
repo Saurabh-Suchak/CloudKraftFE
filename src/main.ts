@@ -689,22 +689,24 @@ async function initAWSConnect(): Promise<void> {
   if (connectForm.hasAttribute('data-initialized')) return;
   connectForm.setAttribute('data-initialized', 'true');
 
-  // Generate external ID for assume role (same as initAwsSignupForm)
-  const extIdDisplay = document.getElementById('displayExternalId');
-  const extIdHidden  = document.getElementById('awsExternalId') as HTMLInputElement | null;
-  if (extIdDisplay && extIdHidden && !extIdHidden.value) {
-    const externalId = crypto.randomUUID();
-    extIdDisplay.textContent = externalId;
-    extIdHidden.value = externalId;
-  }
+  // External ID is fetched from backend (permanent per-user, generated on registration)
+  // Will be populated after getAWSStatus() resolves below
 
   // Radio card toggling
   const radios = document.querySelectorAll<HTMLInputElement>('input[name="authMethod"]');
   const toggleSections = (method: string) => {
     const accessKeySection  = document.getElementById('accessKeySection');
     const assumeRoleSection = document.getElementById('assumeRoleSection');
-    if (accessKeySection)  accessKeySection.style.display  = method === 'access_key'  ? '' : 'none';
-    if (assumeRoleSection) assumeRoleSection.style.display = method === 'assume_role' ? '' : 'none';
+    if (accessKeySection) {
+      const show = method === 'access_key';
+      accessKeySection.style.display = show ? 'block' : 'none';
+      accessKeySection.classList.toggle('active', show);
+    }
+    if (assumeRoleSection) {
+      const show = method === 'assume_role';
+      assumeRoleSection.style.display = show ? 'block' : 'none';
+      assumeRoleSection.classList.toggle('active', show);
+    }
   };
   radios.forEach(r => r.addEventListener('change', () => toggleSections(r.value)));
   // Set initial state from checked radio
@@ -723,6 +725,14 @@ async function initAWSConnect(): Promise<void> {
 
   const status = await apiService.getAWSStatus();
   if (!banner || !bannerTxt) return;
+
+  // Populate permanent external ID from backend
+  const extIdDisplay = document.getElementById('displayExternalId');
+  const extIdHidden  = document.getElementById('awsExternalId') as HTMLInputElement | null;
+  if (status.data?.external_id) {
+    if (extIdDisplay) extIdDisplay.textContent = status.data.external_id;
+    if (extIdHidden)  extIdHidden.value = status.data.external_id;
+  }
 
   if (status.data?.connected) {
     banner.className = 'aws-status-banner aws-status-connected';

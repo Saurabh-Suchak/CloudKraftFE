@@ -215,7 +215,7 @@ class ApiService {
   }
 
   async getAWSStatus() {
-    return this.request<{ connected: boolean; auth_method: string | null; region: string | null; role_arn: string | null }>(
+    return this.request<{ connected: boolean; auth_method: string | null; region: string | null; role_arn: string | null; external_id: string | null }>(
       '/api/auth/aws-status'
     );
   }
