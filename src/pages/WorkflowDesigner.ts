@@ -79,16 +79,16 @@ export const WorkflowDesigner = (): string => {
             </svg>
             <span>AWS Connect</span>
           </a>
-          <a href="/deployment" data-navigate="/deployment" class="nav-item">
+          <a href="/deployments" data-navigate="/deployments" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
               <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
               <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            <span>Deployment</span>
+            <span>Deployments</span>
           </a>
         </nav>
-        
+
         <div class="sidebar-footer">
           <div class="user-profile">
             <div class="user-avatar" data-user-avatar>U</div>
@@ -187,7 +187,7 @@ export const WorkflowDesigner = (): string => {
 
       <main class="workflow-main">
         <header class="workflow-header">
-          <h2 class="workflow-title">Workflow Designer</h2>
+          <h2 class="workflow-title" contenteditable="true" spellcheck="false" data-placeholder="Workflow name"></h2>
           <div class="workflow-actions">
             <div class="undo-redo-group">
               <button class="btn btn-undo-redo" id="undoBtn" title="Undo (Ctrl+Z)" disabled>

@@ -193,6 +193,23 @@ class ApiService {
     );
   }
 
+  // Deployments
+  async listDeployments() {
+    return this.request<any[]>('/api/deploy/');
+  }
+
+  async getDeployment(id: number) {
+    return this.request<any>(`/api/deploy/${id}`);
+  }
+
+  async destroyDeployment(id: number) {
+    return this.request<any>(`/api/deploy/${id}/destroy`, { method: 'POST' });
+  }
+
+  async getDeploymentLogs(id: number, afterId = 0) {
+    return this.request<{ logs: any[]; deployment_status: string }>(`/api/deploy/${id}/logs?after_id=${afterId}`);
+  }
+
   async getAWSStatus() {
     return this.request<{ connected: boolean; auth_method: string | null; region: string | null; role_arn: string | null }>(
       '/api/auth/aws-status'
