@@ -127,19 +127,57 @@ async function initDashboard(): Promise<void> {
     }
   }
 
-  tbody.innerHTML = '<tr><td colspan="3" class="table-loading">Loading projects...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="4" class="table-loading">Loading projects...</td></tr>';
 
-  const result = await apiService.getWorkflows();
+  const [result, deplResult] = await Promise.all([
+    apiService.getWorkflows(),
+    apiService.listDeployments(),
+  ]);
+
   if (result.error) {
-    tbody.innerHTML = `<tr><td colspan="3" class="table-empty">Could not load projects: ${escapeHtml(result.error)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4" class="table-empty">Could not load projects: ${escapeHtml(result.error)}</td></tr>`;
     return;
   }
 
   const workflows: any[] = result.data || [];
   workflowsCache = workflows;
 
+  // Build map: workflow_id → latest deployment status
+  const deployments: any[] = deplResult.data || [];
+  const latestDeployStatus = new Map<number, string>();
+  for (const d of deployments) {
+    if (d.workflow_id != null) {
+      const existing = latestDeployStatus.get(d.workflow_id);
+      if (!existing || new Date(d.started_at) > new Date(deployments.find((x: any) => x.status === existing && x.workflow_id === d.workflow_id)?.started_at || 0)) {
+        latestDeployStatus.set(d.workflow_id, d.status);
+      }
+    }
+  }
+
+  const deployStatusBadge = (wfId: number): string => {
+    const status = latestDeployStatus.get(wfId);
+    if (!status) return '<span class="status-badge status-not-deployed">Not Deployed</span>';
+    const cls: Record<string, string> = {
+      succeeded: 'status-succeeded',
+      failed:    'status-failed',
+      running:   'status-running',
+      pending:   'status-pending',
+      destroying:'status-running',
+      destroyed: 'destroyed',
+    };
+    const label: Record<string, string> = {
+      succeeded: 'Deployed',
+      failed:    'Failed',
+      running:   'Deploying',
+      pending:   'Pending',
+      destroying:'Destroying',
+      destroyed: 'Destroyed',
+    };
+    return `<span class="status-badge ${cls[status] || ''}">${label[status] || status}</span>`;
+  };
+
   if (workflows.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="3" class="table-empty">No projects yet. Click "New Project" to get started.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" class="table-empty">No projects yet. Click "New Project" to get started.</td></tr>';
     return;
   }
 
@@ -147,10 +185,17 @@ async function initDashboard(): Promise<void> {
     <tr>
       <td>${escapeHtml(wf.name)}${wf.description ? `<div class="project-desc">${escapeHtml(wf.description)}</div>` : ''}</td>
       <td>${formatRelativeDate(wf.updated_at || wf.created_at)}</td>
+      <td>${deployStatusBadge(wf.id)}</td>
       <td>
         <div class="action-links">
-          <button class="action-link" data-action="open" data-id="${wf.id}">Open</button>
-          <button class="action-link action-link-danger" data-action="delete" data-id="${wf.id}" data-name="${escapeHtml(wf.name)}">Delete</button>
+          <button class="action-link" data-action="open" data-id="${wf.id}">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            Open
+          </button>
+          <button class="action-link action-link-danger" data-action="delete" data-id="${wf.id}" data-name="${escapeHtml(wf.name)}">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+            Delete
+          </button>
         </div>
       </td>
     </tr>
@@ -176,7 +221,24 @@ async function initDashboard(): Promise<void> {
     btn.addEventListener('click', async () => {
       const id   = parseInt(btn.getAttribute('data-id')   || '0');
       const name = btn.getAttribute('data-name') || 'this project';
-      if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+
+      const activeDepls = deployments.filter(
+        (d: any) => d.workflow_id === id && d.status === 'succeeded'
+      );
+
+      const confirmMsg = activeDepls.length > 0
+        ? `Delete "${name}"?\n\nThis project has ${activeDepls.length} active deployment(s). AWS resources will be destroyed before deletion.\n\nThis cannot be undone.`
+        : `Delete "${name}"? This cannot be undone.`;
+
+      if (!confirm(confirmMsg)) return;
+
+      btn.disabled = true;
+      btn.textContent = activeDepls.length > 0 ? 'Destroying...' : 'Deleting...';
+
+      // Destroy active deployments first
+      for (const d of activeDepls) {
+        await apiService.destroyDeployment(d.id);
+      }
 
       const del = await apiService.deleteWorkflow(id);
       if (del.error) { alert(`Delete failed: ${del.error}`); return; }
@@ -314,6 +376,8 @@ function onRouteChange(): void {
 const appEl = document.getElementById('app');
 if (appEl) {
   new MutationObserver(onRouteChange).observe(appEl, { childList: true });
+  // Initial render fires before observer is wired — run once manually
+  onRouteChange();
 }
 
 // ─── AWS Signup form helpers ──────────────────────────────────────────────────
