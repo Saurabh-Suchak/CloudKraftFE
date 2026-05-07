@@ -37,6 +37,10 @@ class ApiService {
         return { error: error.detail || `HTTP ${response.status}` };
       }
 
+      if (response.status === 204 || response.headers.get('content-length') === '0') {
+        return { data: undefined as T };
+      }
+
       const data = await response.json();
       return { data };
     } catch (error) {
