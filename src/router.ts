@@ -3,11 +3,14 @@ type Route = {
   component: () => string;
 };
 
+type GuardFn = (to: string) => string | null; // return redirect path, or null to allow
+
 class Router {
   private routes: Route[] = [];
   private currentPath: string = '';
   private initialized: boolean = false;
   private clickHandler: ((e: Event) => void) | null = null;
+  private guard: GuardFn | null = null;
 
   constructor() {
     this.currentPath = window.location.pathname || '/';
@@ -50,6 +53,10 @@ class Router {
     this.routes.push({ path, component });
   }
 
+  setGuard(fn: GuardFn): void {
+    this.guard = fn;
+  }
+
   navigate(path: string): void {
     this.currentPath = path;
     window.history.pushState({}, '', path);
@@ -58,9 +65,19 @@ class Router {
 
   private render(): void {
     const pathname = this.currentPath.split('?')[0];
+
+    if (this.guard) {
+      const redirect = this.guard(pathname);
+      if (redirect) {
+        this.currentPath = redirect;
+        window.history.replaceState({}, '', redirect);
+        return this.render();
+      }
+    }
+
     const route = this.routes.find(r => r.path === pathname) ||
                   this.routes.find(r => r.path === '*');
-    
+
     const app = document.querySelector('#app');
     if (app && route) {
       app.innerHTML = route.component();
