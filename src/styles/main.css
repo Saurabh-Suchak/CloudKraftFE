@@ -719,6 +719,27 @@ body {
   font-size: 1.25rem;
   font-weight: 600;
   color: var(--text-primary);
+  cursor: text;
+  border-radius: 0.25rem;
+  padding: 0.1rem 0.35rem;
+  min-width: 6rem;
+  outline: none;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+
+.workflow-title:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.workflow-title:focus {
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: 0 0 0 2px var(--accent-color, #6366f1);
+}
+
+.workflow-title:empty::before {
+  content: attr(data-placeholder);
+  color: var(--text-secondary);
+  pointer-events: none;
 }
 
 .workflow-actions {
@@ -2400,4 +2421,197 @@ body {
   color: var(--text-secondary);
   font-weight: 400;
   margin-left: 0.25rem;
+}
+
+/* ─── Deployments List Page ──────────────────────────────────────────────── */
+
+.deployments-list-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-primary);
+}
+
+.deployments-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+}
+
+.deployments-list-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.5rem;
+}
+
+.deployments-loading,
+.deployments-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 4rem 2rem;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+.deployments-empty svg {
+  opacity: 0.3;
+}
+
+.deployments-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--bg-secondary);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+}
+
+.deployments-table thead {
+  background: var(--bg-tertiary, #1a1f2e);
+}
+
+.deployments-table th {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.deployments-table td {
+  padding: 0.875rem 1rem;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: middle;
+}
+
+.deployments-table tr:last-child td {
+  border-bottom: none;
+}
+
+.deployments-table tr:hover td {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.depl-name {
+  font-weight: 500;
+}
+
+.depl-time {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.depl-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.btn-sm {
+  padding: 0.25rem 0.75rem;
+  font-size: 0.8rem;
+  border-radius: 0.25rem;
+}
+
+.btn-danger {
+  background: transparent;
+  border: 1px solid #ef4444;
+  color: #ef4444;
+  cursor: pointer;
+  border-radius: 0.25rem;
+  font-size: 0.8rem;
+  padding: 0.25rem 0.75rem;
+  transition: background 0.15s;
+}
+
+.btn-danger:hover {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.btn-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.status-badge.destroyed {
+  background: rgba(100, 116, 139, 0.15);
+  color: #94a3b8;
+  border-color: rgba(100, 116, 139, 0.3);
+}
+
+/* ─── AWS Connection Banner (Dashboard) ──────────────────────────────────── */
+
+.aws-connection-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 1.5rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border-bottom: 1px solid transparent;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.aws-banner-connected {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.3);
+  color: #000;
+}
+
+.aws-banner-disconnected {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.25);
+  color: #000;
+}
+
+.aws-banner-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.aws-banner-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.aws-banner-connected .aws-banner-dot {
+  background: #22c55e;
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.7);
+}
+
+.aws-banner-disconnected .aws-banner-dot {
+  background: #ef4444;
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.5);
+}
+
+.aws-banner-right {
+  color: inherit;
+  opacity: 0.85;
+}
+
+.aws-banner-link {
+  color: #000;
+  text-decoration: none;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.3);
+}
+
+.aws-banner-link:hover {
+  color: #333;
+  border-color: #333;
 }

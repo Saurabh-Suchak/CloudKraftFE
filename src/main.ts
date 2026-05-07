@@ -7,6 +7,7 @@ import { WorkflowDesigner } from './pages/WorkflowDesigner';
 import { CodeViewer } from './pages/CodeViewer';
 import { DeploymentStatus } from './pages/DeploymentStatus';
 import { AWSConnect } from './pages/AWSConnect';
+import { DeploymentsList } from './pages/DeploymentsList';
 import { NotFound } from './pages/NotFound';
 import './styles/main.css';
 import { reinitWorkflowDesigner, resetWorkflowDesignerInit, loadWorkflowState } from './workflow';
@@ -24,6 +25,7 @@ router.addRoute('/workflow', WorkflowDesigner);
 router.addRoute('/code', CodeViewer);
 router.addRoute('/deployment', DeploymentStatus);
 router.addRoute('/aws-connect', AWSConnect);
+router.addRoute('/deployments', DeploymentsList);
 router.addRoute('*', NotFound);
 
 // Initialize router
@@ -97,6 +99,24 @@ async function initDashboard(): Promise<void> {
     localStorage.removeItem('current_workflow_id');
     localStorage.removeItem('current_workflow_name');
   });
+
+  // AWS connection banner — always fetch live from API
+  const banner     = document.getElementById('awsConnectionBanner');
+  const bannerDot  = document.getElementById('awsBannerDot');
+  const bannerLabel = document.getElementById('awsBannerLabel');
+  const bannerRight = document.getElementById('awsBannerRight');
+  if (banner) {
+    const awsStatus = await apiService.getAWSStatus();
+    const connected = awsStatus.data?.connected === true;
+    banner.className = `aws-connection-banner ${connected ? 'aws-banner-connected' : 'aws-banner-disconnected'}`;
+    if (bannerLabel) bannerLabel.textContent = connected ? 'AWS Connected' : 'AWS Not Connected';
+    if (bannerRight) {
+      bannerRight.innerHTML = connected
+        ? `Region: <strong>${awsStatus.data?.region || '—'}</strong>
+           &nbsp;|&nbsp; Auth: <strong>${awsStatus.data?.auth_method === 'assume_role' ? 'IAM Role' : 'Access Keys'}</strong>`
+        : `<a href="/aws-connect" data-navigate="/aws-connect" class="aws-banner-link">Connect AWS →</a>`;
+    }
+  }
 
   tbody.innerHTML = '<tr><td colspan="3" class="table-loading">Loading projects...</td></tr>';
 
@@ -198,20 +218,58 @@ function onRouteChange(): void {
         }
       } catch { /* ignore malformed data */ }
     } else {
-      // Restore canvas state when navigating back from code/deployment view
       const canvasJson = localStorage.getItem('canvas_state');
-      if (canvasJson) {
-        try {
-          const state = JSON.parse(canvasJson);
-          if (state?.nodes?.length) {
-            setTimeout(() => {
-              loadWorkflowState(state);
-              setDesignerTitle(localStorage.getItem('current_workflow_name'));
-            }, 200);
+      const hasCanvas = (() => {
+        try { const s = JSON.parse(canvasJson || ''); return s?.nodes?.length > 0; } catch { return false; }
+      })();
+
+      const autoName = () => {
+        apiService.getWorkflows().then(result => {
+          const count = (result.data?.length ?? 0) + 1;
+          const name = `Workflow ${count}`;
+          localStorage.setItem('current_workflow_name', name);
+          setDesignerTitle(name);
+        });
+      };
+
+      if (hasCanvas) {
+        setTimeout(() => {
+          loadWorkflowState(JSON.parse(canvasJson!));
+          const savedName = localStorage.getItem('current_workflow_name');
+          if (savedName) {
+            setDesignerTitle(savedName);
+          } else {
+            autoName();
           }
-        } catch { /* ignore malformed data */ }
+        }, 200);
+      } else {
+        autoName();
       }
     }
+
+    // Editable title — save on blur or Enter
+    setTimeout(() => {
+      const titleEl = document.querySelector('.workflow-title') as HTMLElement | null;
+      if (!titleEl || titleEl.hasAttribute('data-title-wired')) return;
+      titleEl.setAttribute('data-title-wired', 'true');
+
+      const save = async () => {
+        const newName = titleEl.textContent?.trim() || 'Untitled Workflow';
+        if (!titleEl.textContent?.trim()) titleEl.textContent = newName;
+        localStorage.setItem('current_workflow_name', newName);
+        const wfId = localStorage.getItem('current_workflow_id');
+        if (wfId) await apiService.updateWorkflow(parseInt(wfId), { name: newName });
+      };
+
+      titleEl.addEventListener('blur', save);
+      titleEl.addEventListener('keydown', (e: KeyboardEvent) => {
+        if (e.key === 'Enter') { e.preventDefault(); titleEl.blur(); }
+        if (e.key === 'Escape') {
+          titleEl.textContent = localStorage.getItem('current_workflow_name') || 'Untitled Workflow';
+          titleEl.blur();
+        }
+      });
+    }, 300);
   }
 
   // Initialize AWS Signup form if it exists in DOM
@@ -237,6 +295,10 @@ function onRouteChange(): void {
 
   if (document.getElementById('awsConnectForm')) {
     initAWSConnect();
+  }
+
+  if (document.getElementById('deploymentsContainer')) {
+    initDeploymentsList();
   }
 }
 
@@ -579,4 +641,131 @@ async function initAWSConnect(): Promise<void> {
     banner.className = 'aws-status-banner aws-status-disconnected';
     bannerTxt.textContent = 'Not connected — enter credentials below to connect';
   }
+}
+
+// ─── Deployments list ─────────────────────────────────────────────────────────
+
+const API_BASE_DEPLOY = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+function deplAuthHeaders(): Record<string, string> {
+  const token = localStorage.getItem('auth_token');
+  return token
+    ? { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+    : { 'Content-Type': 'application/json' };
+}
+
+function deplStatusClass(status: string): string {
+  if (status === 'succeeded') return 'success';
+  if (status === 'failed') return 'error';
+  if (status === 'destroyed') return 'destroyed';
+  return 'warning';
+}
+
+async function initDeploymentsList(): Promise<void> {
+  const container = document.getElementById('deploymentsContainer');
+  if (!container) return;
+
+  const render = async () => {
+    container.innerHTML = '<div class="deployments-loading">Loading deployments...</div>';
+    const token = localStorage.getItem('auth_token');
+    if (!token) {
+      container.innerHTML = '<div class="deployments-empty">Not logged in.</div>';
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE_DEPLOY}/api/deploy/`, { headers: deplAuthHeaders() });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const deployments: any[] = await res.json();
+
+      if (deployments.length === 0) {
+        container.innerHTML = `
+          <div class="deployments-empty">
+            <svg viewBox="0 0 24 24" fill="none" width="48" height="48" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <p>No deployments yet.</p>
+            <a href="/workflow" data-navigate="/workflow" class="btn btn-primary">Go to Designer</a>
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = `
+        <table class="deployments-table">
+          <thead>
+            <tr>
+              <th>Workflow</th>
+              <th>Status</th>
+              <th>Started</th>
+              <th>Resources</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${deployments.map(d => `
+              <tr data-deployment-id="${d.id}">
+                <td class="depl-name">${d.workflow_name || '—'}</td>
+                <td><span class="status-badge ${deplStatusClass(d.status)}">${d.status}</span></td>
+                <td class="depl-time">${d.started_at ? new Date(d.started_at).toLocaleString() : '—'}</td>
+                <td>${d.resource_count != null ? d.resource_count : '—'}</td>
+                <td class="depl-actions">
+                  <button class="btn btn-sm btn-outline depl-view-btn" data-id="${d.id}">View Logs</button>
+                  ${d.status === 'succeeded'
+                    ? `<button class="btn btn-sm btn-danger depl-destroy-btn" data-id="${d.id}">Destroy</button>`
+                    : ''}
+                </td>
+              </tr>`).join('')}
+          </tbody>
+        </table>`;
+    } catch (e) {
+      container.innerHTML = `<div class="deployments-empty">Failed to load deployments: ${e}</div>`;
+    }
+  };
+
+  await render();
+
+  // Refresh button
+  document.getElementById('refreshDeploymentsBtn')?.addEventListener('click', render);
+
+  // Event delegation for View / Destroy buttons
+  container.addEventListener('click', async (e) => {
+    const target = e.target as HTMLElement;
+
+    if (target.classList.contains('depl-view-btn')) {
+      const id = target.dataset.id;
+      if (id) { const { router } = await import('./router'); router.navigate(`/deployment?id=${id}`); }
+    }
+
+    if (target.classList.contains('depl-destroy-btn')) {
+      const id = target.dataset.id;
+      if (!id) return;
+      if (!confirm('Destroy all AWS resources from this deployment? This cannot be undone.')) return;
+
+      target.setAttribute('disabled', 'true');
+      target.textContent = 'Destroying...';
+
+      try {
+        const res = await fetch(`${API_BASE_DEPLOY}/api/deploy/${id}/destroy`, {
+          method: 'POST',
+          headers: deplAuthHeaders(),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ detail: 'Unknown error' }));
+          alert(`Destroy failed: ${err.detail}`);
+          target.removeAttribute('disabled');
+          target.textContent = 'Destroy';
+          return;
+        }
+        // Navigate to detail page to watch destroy logs
+        const { router } = await import('./router');
+        router.navigate(`/deployment?id=${id}`);
+      } catch (err) {
+        alert(`Network error: ${err}`);
+        target.removeAttribute('disabled');
+        target.textContent = 'Destroy';
+      }
+    }
+  });
 }
