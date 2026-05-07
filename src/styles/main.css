@@ -2224,10 +2224,9 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Force display rules for Sections */
 #accessKeySection.active,
 #assumeRoleSection.active {
-    display: block !important;
+    display: block;
 }
 
 /* ── AWS Connect Page ─────────────────────────────────────────────────────── */
