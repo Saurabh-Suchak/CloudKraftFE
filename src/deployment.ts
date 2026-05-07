@@ -162,7 +162,7 @@ async function runDeploy(workflowState: any, workflowName: string): Promise<void
     }
     const data = await res.json();
     deploymentId = data.id;
-    addLog(logsEl, `Deployment #${deploymentId} queued`);
+    addLog(logsEl, 'Deployment queued — streaming logs...');
   } catch (e) {
     addLog(logsEl, `Network error: ${e}`, 'error');
     setStatus('Failed', 'error');
