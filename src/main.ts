@@ -6,6 +6,7 @@ import { Dashboard } from './pages/Dashboard';
 import { WorkflowDesigner } from './pages/WorkflowDesigner';
 import { CodeViewer } from './pages/CodeViewer';
 import { DeploymentStatus } from './pages/DeploymentStatus';
+import { AWSConnect } from './pages/AWSConnect';
 import { NotFound } from './pages/NotFound';
 import './styles/main.css';
 import { reinitWorkflowDesigner, resetWorkflowDesignerInit, loadWorkflowState } from './workflow';
@@ -22,6 +23,7 @@ router.addRoute('/dashboard', Dashboard);
 router.addRoute('/workflow', WorkflowDesigner);
 router.addRoute('/code', CodeViewer);
 router.addRoute('/deployment', DeploymentStatus);
+router.addRoute('/aws-connect', AWSConnect);
 router.addRoute('*', NotFound);
 
 // Initialize router
@@ -231,6 +233,10 @@ function onRouteChange(): void {
   if (document.querySelector('.deployment-main')) {
     deploymentInitialized = true;
     initDeployment();
+  }
+
+  if (document.getElementById('awsConnectForm')) {
+    initAWSConnect();
   }
 }
 
@@ -475,4 +481,102 @@ document.addEventListener('submit', async (e) => {
       submitBtn.innerHTML = originalBtnContent;
     });
   }
+
+  // ── AWS Connect form ──────────────────────────────────────────────────────────
+  if (form.id === 'awsConnectForm') {
+    e.preventDefault();
+    const method  = (document.getElementById('connectAuthMethod') as HTMLInputElement)?.value as 'access_key' | 'assume_role';
+    const region  = (document.getElementById('connectRegion')    as HTMLSelectElement)?.value;
+    const feedback = document.getElementById('awsConnectFeedback');
+    const submitBtn = document.getElementById('awsConnectSubmit') as HTMLButtonElement;
+
+    const showFeedback = (msg: string, isError: boolean) => {
+      if (!feedback) return;
+      feedback.style.display = 'block';
+      feedback.className = `aws-connect-feedback ${isError ? 'aws-connect-feedback-error' : 'aws-connect-feedback-success'}`;
+      feedback.textContent = msg;
+    };
+
+    let payload: Parameters<typeof apiService.connectAWS>[0] = { auth_method: method, region };
+
+    if (method === 'access_key') {
+      const accessKey = (document.getElementById('connectAccessKey') as HTMLInputElement)?.value.trim();
+      const secretKey = (document.getElementById('connectSecretKey') as HTMLInputElement)?.value.trim();
+      if (!accessKey || !secretKey) { showFeedback('Access Key ID and Secret Access Key are required.', true); return; }
+      payload = { ...payload, access_key: accessKey, secret_key: secretKey };
+    } else {
+      const roleArn    = (document.getElementById('connectRoleArn')    as HTMLInputElement)?.value.trim();
+      const externalId = (document.getElementById('connectExternalId') as HTMLInputElement)?.value.trim();
+      if (!roleArn) { showFeedback('IAM Role ARN is required.', true); return; }
+      if (!roleArn.startsWith('arn:aws:iam::')) { showFeedback('Invalid Role ARN format. Must start with arn:aws:iam::', true); return; }
+      payload = { ...payload, role_arn: roleArn, external_id: externalId || undefined };
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Connecting...';
+    if (feedback) feedback.style.display = 'none';
+
+    const result = await apiService.connectAWS(payload);
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Connect AWS Account';
+
+    if (result.error) {
+      showFeedback(`Connection failed: ${result.error}`, true);
+      return;
+    }
+
+    localStorage.setItem('aws_connected', 'true');
+    localStorage.setItem('aws_region', result.data?.region || region);
+
+    const banner  = document.getElementById('awsStatusBanner');
+    const bannerTxt = document.getElementById('awsStatusText');
+    if (banner && bannerTxt) {
+      banner.className = 'aws-status-banner aws-status-connected';
+      bannerTxt.textContent = `Connected · ${result.data?.auth_method === 'assume_role' ? 'IAM Role' : 'Access Keys'} · ${result.data?.region}`;
+    }
+    showFeedback('AWS account connected successfully!', false);
+  }
 });
+
+// ─── AWS Connect page init ────────────────────────────────────────────────────
+
+async function initAWSConnect(): Promise<void> {
+  document.getElementById('tabAccessKey')?.addEventListener('click', () => {
+    (document.getElementById('connectAuthMethod') as HTMLInputElement).value = 'access_key';
+    document.getElementById('accessKeyFields')!.style.display = '';
+    document.getElementById('assumeRoleFields')!.style.display = 'none';
+    document.getElementById('tabAccessKey')!.classList.add('active');
+    document.getElementById('tabAssumeRole')!.classList.remove('active');
+  });
+
+  document.getElementById('tabAssumeRole')?.addEventListener('click', () => {
+    (document.getElementById('connectAuthMethod') as HTMLInputElement).value = 'assume_role';
+    document.getElementById('accessKeyFields')!.style.display = 'none';
+    document.getElementById('assumeRoleFields')!.style.display = '';
+    document.getElementById('tabAssumeRole')!.classList.add('active');
+    document.getElementById('tabAccessKey')!.classList.remove('active');
+  });
+
+  document.getElementById('connectSecretToggle')?.addEventListener('click', () => {
+    const input = document.getElementById('connectSecretKey') as HTMLInputElement;
+    if (input) input.type = input.type === 'password' ? 'text' : 'password';
+  });
+
+  const banner    = document.getElementById('awsStatusBanner');
+  const bannerTxt = document.getElementById('awsStatusText');
+  const regionSel = document.getElementById('connectRegion') as HTMLSelectElement;
+
+  const status = await apiService.getAWSStatus();
+  if (!banner || !bannerTxt) return;
+
+  if (status.data?.connected) {
+    banner.className = 'aws-status-banner aws-status-connected';
+    const method = status.data.auth_method === 'assume_role' ? 'IAM Role' : 'Access Keys';
+    bannerTxt.textContent = `Connected · ${method} · ${status.data.region}`;
+    if (regionSel && status.data.region) regionSel.value = status.data.region;
+    if (status.data.auth_method === 'assume_role') document.getElementById('tabAssumeRole')?.click();
+  } else {
+    banner.className = 'aws-status-banner aws-status-disconnected';
+    bannerTxt.textContent = 'Not connected — enter credentials below to connect';
+  }
+}

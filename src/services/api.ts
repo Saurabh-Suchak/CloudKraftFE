@@ -178,6 +178,27 @@ class ApiService {
   }
 
   // Validation
+  // AWS Connection
+  async connectAWS(payload: {
+    auth_method: 'access_key' | 'assume_role';
+    region: string;
+    access_key?: string;
+    secret_key?: string;
+    role_arn?: string;
+    external_id?: string;
+  }) {
+    return this.request<{ connected: boolean; auth_method: string; region: string; role_arn?: string }>(
+      '/api/auth/connect-aws',
+      { method: 'POST', body: JSON.stringify(payload) }
+    );
+  }
+
+  async getAWSStatus() {
+    return this.request<{ connected: boolean; auth_method: string | null; region: string | null; role_arn: string | null }>(
+      '/api/auth/aws-status'
+    );
+  }
+
   async validateCode(
     terraformCode: string,
     files?: Array<{ filename: string; content: string }>,
