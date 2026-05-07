@@ -20,6 +20,13 @@ export const CodeViewer = (): string => {
             </svg>
             <span>Projects</span>
           </a>
+          <a href="/aws-connect" data-navigate="/aws-connect" class="nav-item">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M20 16.2A4.5 4.5 0 0 0 17.5 8h-1.8A7 7 0 1 0 4 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M12 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0-2 0M12 13v4M10 19h4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span>AWS Connect</span>
+          </a>
           <a href="/workflow" data-navigate="/workflow" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/>
@@ -29,13 +36,13 @@ export const CodeViewer = (): string => {
             </svg>
             <span>Designer</span>
           </a>
-          <a href="/deployment" data-navigate="/deployment" class="nav-item">
+          <a href="/deployments" data-navigate="/deployments" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
               <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
               <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            <span>Deployment</span>
+            <span>Deployments</span>
           </a>
         </nav>
 

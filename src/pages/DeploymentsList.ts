@@ -1,4 +1,4 @@
-export const DeploymentStatus = (): string => {
+export const DeploymentsList = (): string => {
   return `
     <div class="app-container">
       <aside class="sidebar">
@@ -64,63 +64,18 @@ export const DeploymentStatus = (): string => {
         </div>
       </aside>
 
-      <main class="deployment-main">
-        <header class="deployment-header">
-          <div>
-            <h2 class="page-title">Deployment</h2>
-            <div class="deployment-info">
-              <h3 class="deployment-name" id="deploymentWorkflowName">—</h3>
-              <div class="deployment-meta">
-                <span class="status-badge" id="deploymentStatusBadge">
-                  <span class="status-dot"></span>
-                  <span id="deploymentStatusText">Ready</span>
-                </span>
-                <span class="deployment-time" id="deploymentTime"></span>
-              </div>
-            </div>
-          </div>
-          <div class="deployment-actions">
-            <button class="btn btn-outline" id="backToCodeBtn">Back to Code</button>
-            <button class="btn btn-primary" id="startDeployBtn">Run Deployment</button>
+      <main class="deployments-list-main">
+        <header class="deployments-list-header">
+          <h2 class="page-title">Deployments</h2>
+          <div class="header-actions">
+            <button class="btn btn-outline" id="refreshDeploymentsBtn">Refresh</button>
+            <div class="user-avatar-small" data-user-avatar>U</div>
           </div>
         </header>
 
-        <div class="deployment-content">
-          <div class="deployment-logs-panel">
-            <div class="logs-header">Deployment Logs</div>
-            <div class="logs-container" id="deploymentLogs">
-              <div class="log-entry">
-                <span class="log-message log-info">Waiting to start deployment...</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="deployment-summary-panel">
-            <h3 class="panel-title">Summary</h3>
-            <div class="summary-content">
-              <div class="summary-item">
-                <div class="summary-label">Status</div>
-                <div class="summary-value" id="summaryStatus">—</div>
-              </div>
-              <div class="summary-item">
-                <div class="summary-label">Resources</div>
-                <div class="summary-value" id="summaryNodeCount">—</div>
-              </div>
-              <div class="summary-item">
-                <div class="summary-label">Files Generated</div>
-                <div class="summary-value" id="summaryFileCount">—</div>
-              </div>
-              <div class="summary-item">
-                <div class="summary-label">Triggered by</div>
-                <div class="summary-value" data-user-name>—</div>
-              </div>
-              <div class="summary-item">
-                <div class="summary-label">Started at</div>
-                <div class="summary-value" id="summaryStartedAt">—</div>
-              </div>
-            </div>
-
-            <div class="deployment-files" id="deploymentFiles"></div>
+        <div class="deployments-list-content">
+          <div id="deploymentsContainer">
+            <div class="deployments-loading">Loading deployments...</div>
           </div>
         </div>
       </main>
