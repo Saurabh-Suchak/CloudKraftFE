@@ -28,6 +28,15 @@ router.addRoute('/aws-connect', AWSConnect);
 router.addRoute('/deployments', DeploymentsList);
 router.addRoute('*', NotFound);
 
+const PUBLIC_ROUTES = new Set(['/', '/login', '/signup', '/signup-aws']);
+
+router.setGuard((to: string) => {
+  const token = localStorage.getItem('auth_token');
+  if (!token && !PUBLIC_ROUTES.has(to)) return '/login';
+  if (token && (to === '/' || to === '/login')) return '/dashboard';
+  return null;
+});
+
 // Initialize router
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => router.init());
@@ -363,6 +372,13 @@ setInterval(() => {
   }
 }, 250);
 
+setInterval(() => {
+  const connectForm = document.getElementById('awsConnectForm');
+  if (connectForm && !connectForm.hasAttribute('data-initialized')) {
+    initAWSConnect();
+  }
+}, 250);
+
 // ─── Logout ───────────────────────────────────────────────────────────────────
 
 document.addEventListener('click', (e) => {
@@ -547,9 +563,10 @@ document.addEventListener('submit', async (e) => {
   // ── AWS Connect form ──────────────────────────────────────────────────────────
   if (form.id === 'awsConnectForm') {
     e.preventDefault();
-    const method  = (document.getElementById('connectAuthMethod') as HTMLInputElement)?.value as 'access_key' | 'assume_role';
-    const region  = (document.getElementById('connectRegion')    as HTMLSelectElement)?.value;
-    const feedback = document.getElementById('awsConnectFeedback');
+    const methodEl = form.querySelector('input[name="authMethod"]:checked') as HTMLInputElement;
+    const method   = (methodEl?.value || 'assume_role') as 'access_key' | 'assume_role';
+    const region   = (document.getElementById('awsRegion') as HTMLSelectElement)?.value;
+    const feedback  = document.getElementById('awsConnectFeedback');
     const submitBtn = document.getElementById('awsConnectSubmit') as HTMLButtonElement;
 
     const showFeedback = (msg: string, isError: boolean) => {
@@ -562,13 +579,13 @@ document.addEventListener('submit', async (e) => {
     let payload: Parameters<typeof apiService.connectAWS>[0] = { auth_method: method, region };
 
     if (method === 'access_key') {
-      const accessKey = (document.getElementById('connectAccessKey') as HTMLInputElement)?.value.trim();
-      const secretKey = (document.getElementById('connectSecretKey') as HTMLInputElement)?.value.trim();
+      const accessKey = (document.getElementById('awsAccessKey') as HTMLInputElement)?.value.trim();
+      const secretKey = (document.getElementById('awsSecretKey') as HTMLInputElement)?.value.trim();
       if (!accessKey || !secretKey) { showFeedback('Access Key ID and Secret Access Key are required.', true); return; }
       payload = { ...payload, access_key: accessKey, secret_key: secretKey };
     } else {
-      const roleArn    = (document.getElementById('connectRoleArn')    as HTMLInputElement)?.value.trim();
-      const externalId = (document.getElementById('connectExternalId') as HTMLInputElement)?.value.trim();
+      const roleArn    = (document.getElementById('awsRoleArn')    as HTMLInputElement)?.value.trim();
+      const externalId = (document.getElementById('awsExternalId') as HTMLInputElement)?.value.trim();
       if (!roleArn) { showFeedback('IAM Role ARN is required.', true); return; }
       if (!roleArn.startsWith('arn:aws:iam::')) { showFeedback('Invalid Role ARN format. Must start with arn:aws:iam::', true); return; }
       payload = { ...payload, role_arn: roleArn, external_id: externalId || undefined };
@@ -603,30 +620,42 @@ document.addEventListener('submit', async (e) => {
 // ─── AWS Connect page init ────────────────────────────────────────────────────
 
 async function initAWSConnect(): Promise<void> {
-  document.getElementById('tabAccessKey')?.addEventListener('click', () => {
-    (document.getElementById('connectAuthMethod') as HTMLInputElement).value = 'access_key';
-    document.getElementById('accessKeyFields')!.style.display = '';
-    document.getElementById('assumeRoleFields')!.style.display = 'none';
-    document.getElementById('tabAccessKey')!.classList.add('active');
-    document.getElementById('tabAssumeRole')!.classList.remove('active');
-  });
+  const connectForm = document.getElementById('awsConnectForm');
+  if (!connectForm) return;
+  if (connectForm.hasAttribute('data-initialized')) return;
+  connectForm.setAttribute('data-initialized', 'true');
 
-  document.getElementById('tabAssumeRole')?.addEventListener('click', () => {
-    (document.getElementById('connectAuthMethod') as HTMLInputElement).value = 'assume_role';
-    document.getElementById('accessKeyFields')!.style.display = 'none';
-    document.getElementById('assumeRoleFields')!.style.display = '';
-    document.getElementById('tabAssumeRole')!.classList.add('active');
-    document.getElementById('tabAccessKey')!.classList.remove('active');
-  });
+  // Generate external ID for assume role (same as initAwsSignupForm)
+  const extIdDisplay = document.getElementById('displayExternalId');
+  const extIdHidden  = document.getElementById('awsExternalId') as HTMLInputElement | null;
+  if (extIdDisplay && extIdHidden && !extIdHidden.value) {
+    const externalId = crypto.randomUUID();
+    extIdDisplay.textContent = externalId;
+    extIdHidden.value = externalId;
+  }
 
-  document.getElementById('connectSecretToggle')?.addEventListener('click', () => {
-    const input = document.getElementById('connectSecretKey') as HTMLInputElement;
+  // Radio card toggling
+  const radios = document.querySelectorAll<HTMLInputElement>('input[name="authMethod"]');
+  const toggleSections = (method: string) => {
+    const accessKeySection  = document.getElementById('accessKeySection');
+    const assumeRoleSection = document.getElementById('assumeRoleSection');
+    if (accessKeySection)  accessKeySection.style.display  = method === 'access_key'  ? '' : 'none';
+    if (assumeRoleSection) assumeRoleSection.style.display = method === 'assume_role' ? '' : 'none';
+  };
+  radios.forEach(r => r.addEventListener('change', () => toggleSections(r.value)));
+  // Set initial state from checked radio
+  const checkedRadio = document.querySelector<HTMLInputElement>('input[name="authMethod"]:checked');
+  if (checkedRadio) toggleSections(checkedRadio.value);
+
+  // Password toggle
+  document.getElementById('awsSecretToggle')?.addEventListener('click', () => {
+    const input = document.getElementById('awsSecretKey') as HTMLInputElement;
     if (input) input.type = input.type === 'password' ? 'text' : 'password';
   });
 
   const banner    = document.getElementById('awsStatusBanner');
   const bannerTxt = document.getElementById('awsStatusText');
-  const regionSel = document.getElementById('connectRegion') as HTMLSelectElement;
+  const regionSel = document.getElementById('awsRegion') as HTMLSelectElement;
 
   const status = await apiService.getAWSStatus();
   if (!banner || !bannerTxt) return;
@@ -636,7 +665,9 @@ async function initAWSConnect(): Promise<void> {
     const method = status.data.auth_method === 'assume_role' ? 'IAM Role' : 'Access Keys';
     bannerTxt.textContent = `Connected · ${method} · ${status.data.region}`;
     if (regionSel && status.data.region) regionSel.value = status.data.region;
-    if (status.data.auth_method === 'assume_role') document.getElementById('tabAssumeRole')?.click();
+    // Pre-select the radio matching saved auth method
+    const matchingRadio = document.querySelector<HTMLInputElement>(`input[name="authMethod"][value="${status.data.auth_method}"]`);
+    if (matchingRadio) { matchingRadio.checked = true; toggleSections(status.data.auth_method); }
   } else {
     banner.className = 'aws-status-banner aws-status-disconnected';
     bannerTxt.textContent = 'Not connected — enter credentials below to connect';
