@@ -924,7 +924,7 @@ body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: var(--bg-tertiary);
+  background: #f7f8fa;
   cursor: default;
   user-select: none;
 }
@@ -1031,32 +1031,77 @@ body {
   height: 100%;
 }
 
+/* ── Canvas node card ──────────────────────────────────────────────────────── */
 .canvas-node {
   position: absolute;
-  background: var(--bg);
-  border: 2px solid var(--border);
-  border-radius: 0.5rem;
-  padding: 1rem;
-  min-width: 200px;
-  box-shadow: var(--shadow-md);
+  background: #ffffff;
+  border: 1px solid #e4e7ec;
+  border-radius: 14px;
+  padding: 14px 12px 10px;
+  width: 120px;
+  text-align: center;
   cursor: move;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 2px 8px rgba(0,0,0,0.04);
+  transition: box-shadow 0.15s, border-color 0.15s, transform 0.1s;
 }
 
 .canvas-node:hover {
-  border-color: var(--primary);
-  box-shadow: var(--shadow-lg);
+  border-color: #c7d2fe;
+  box-shadow: 0 4px 16px rgba(99,102,241,0.14), 0 1px 3px rgba(0,0,0,0.07);
+  transform: translateY(-1px);
 }
 
 .canvas-node.selected {
-  border-color: var(--primary);
-  border-width: 3px;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2.5px rgba(99,102,241,0.2), 0 4px 18px rgba(99,102,241,0.18);
+  transform: translateY(-1px);
 }
 
 .canvas-node.dragging {
-  opacity: 0.5;
+  opacity: 0.6;
   cursor: grabbing;
+  transform: scale(1.04);
 }
+
+/* ── Node inner layout ─────────────────────────────────────────────────────── */
+.node-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.node-icon-wrap {
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: #fff;
+  overflow: hidden;
+}
+
+.node-icon-wrap img {
+  border-radius: 8px;
+  display: block;
+  user-select: none;
+}
+
+.node-name {
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: #374151;
+  text-align: center;
+  line-height: 1.35;
+  word-break: break-word;
+  max-width: 106px;
+  display: block;
+}
+
+/* Keep old text classes harmless (referenced in DOM queries) */
+.node-header, .node-type, .node-output { display: none; }
 
 /* ─── Connection SVG layer ──────────────────────────────────────────────────── */
 
@@ -1073,29 +1118,32 @@ body {
 
 .connection-path {
   fill: none;
-  stroke: #3b82f6;
-  stroke-width: 2;
+  stroke: #475569;
+  stroke-width: 1.5px;
+  stroke-linejoin: round;
   marker-end: url(#arrow);
   pointer-events: visibleStroke;
   cursor: pointer;
+  transition: stroke 0.1s, stroke-width 0.1s;
 }
 
 .connection-path:hover {
-  stroke: #1d4ed8;
-  stroke-width: 3;
+  stroke: #1e293b;
+  stroke-width: 2px;
 }
 
 .connection-selected {
   stroke: #f59e0b !important;
-  stroke-width: 2.5 !important;
+  stroke-width: 2px !important;
   marker-end: url(#arrow-selected) !important;
 }
 
 .connection-ghost {
   fill: none;
   stroke: #94a3b8;
-  stroke-width: 2;
-  stroke-dasharray: 5 4;
+  stroke-width: 1.5px;
+  stroke-dasharray: 6 4;
+  stroke-linejoin: round;
   pointer-events: none;
 }
 
@@ -1103,31 +1151,32 @@ body {
 
 .node-port {
   position: absolute;
-  width: 12px;
-  height: 12px;
-  background: #3b82f6;
-  border: 2px solid #fff;
+  width: 10px;
+  height: 10px;
+  background: #ffffff;
+  border: 1.5px solid #94a3b8;
   border-radius: 50%;
-  opacity: 0.25;
-  transition: opacity 0.15s, transform 0.15s;
+  opacity: 0;
+  transition: opacity 0.15s, transform 0.15s, border-color 0.15s, background 0.15s;
   z-index: 10;
-  box-shadow: 0 0 0 1px #3b82f6;
 }
 
 .canvas-node:hover .node-port,
 .canvas-node.selected .node-port {
   opacity: 1;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px rgba(99,102,241,0.2);
 }
 
 .node-port-in {
-  left: -7px;
+  left: -6px;
   top: 50%;
   transform: translateY(-50%);
   cursor: default;
 }
 
 .node-port-out {
-  right: -7px;
+  right: -6px;
   top: 50%;
   transform: translateY(-50%);
   cursor: crosshair;
@@ -1135,8 +1184,10 @@ body {
 
 .node-port-out:hover {
   opacity: 1 !important;
-  background: #1d4ed8;
-  transform: translateY(-50%) scale(1.3);
+  background: #6366f1;
+  border-color: #4f46e5;
+  transform: translateY(-50%) scale(1.4);
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.25);
 }
 
 .resource-item.dragging {
@@ -1154,34 +1205,8 @@ body {
   font-size: 0.875rem;
 }
 
-.node-header {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
-}
-
-.node-type {
-  font-family: 'Courier New', monospace;
-  font-size: 0.875rem;
-  color: var(--primary);
-  font-weight: 600;
-}
-
-.node-name {
-  font-size: 0.875rem;
-  color: var(--text-primary);
-}
-
-.node-property,
-.node-output {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  margin-top: 0.25rem;
-  font-family: 'Courier New', monospace;
-}
-
 .node-connection-label {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   color: var(--primary);
   margin-top: 0.5rem;
   font-style: italic;

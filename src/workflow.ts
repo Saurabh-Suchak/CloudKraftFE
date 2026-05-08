@@ -131,6 +131,26 @@ const resourceTypes: Record<string, ResourceType> = {
   }
 };
 
+const RESOURCE_CATEGORY: Record<string, string> = {
+  ec2: 'compute',         lambda: 'compute',    autoscaling: 'compute',
+  vpc: 'network',         subnet: 'network',    securitygroup: 'network',
+  internetgateway: 'network', routetable: 'network', natgateway: 'network', loadbalancer: 'network',
+  s3: 'storage',          efs: 'storage',       ebs: 'storage',
+  rds: 'database',        dynamodb: 'database',
+  sns: 'messaging',       sqs: 'messaging',
+  iamrole: 'security',
+  cloudfront: 'cdn',
+};
+
+// Resource icons that have no built-in background (resource/ folder icons)
+// need a wrapper color so they're visible on the white node-icon-wrap.
+const RESOURCE_ICON_BG: Record<string, string> = {
+  internetgateway: '#f0eafa',
+  natgateway:      '#f0eafa',
+  routetable:      '#f0eafa',
+  securitygroup:   '#fce8e8',
+};
+
 let nodeCounter = 0;
 let selectedNode: HTMLElement | null = null;
 let draggedNode: HTMLElement | null = null;
@@ -471,19 +491,25 @@ function createNode(resourceType: string, x: number, y: number): void {
   const nodeName = `${resource.type}-${nodeCounter}`;
   
   const node = document.createElement('div');
+  const category = RESOURCE_CATEGORY[resourceType] || 'default';
+  const iconWrapStyle = RESOURCE_ICON_BG[resourceType]
+    ? `background:${RESOURCE_ICON_BG[resourceType]}`
+    : '';
   node.className = 'canvas-node';
   node.id = nodeId;
   node.setAttribute('data-resource-type', resourceType);
+  node.setAttribute('data-category', category);
   node.style.left = `${x}px`;
   node.style.top = `${y}px`;
-  
+
   node.innerHTML = `
     <div class="node-port node-port-in" data-port="in"></div>
-    <div class="node-header">
-      <span class="node-type">${resource.terraformType}</span>
+    <div class="node-body">
+      <div class="node-icon-wrap" ${iconWrapStyle ? `style="${iconWrapStyle}"` : ''}>
+        <img src="/icons/aws/${resourceType}.svg" width="44" height="44" alt="${resourceType}" draggable="false">
+      </div>
       <span class="node-name">${nodeName}</span>
     </div>
-    <div class="node-output">output: ${resource.type}.id</div>
     <div class="node-port node-port-out" data-port="out"></div>
   `;
 
@@ -534,7 +560,7 @@ function makeNodeDraggable(node: HTMLElement): void {
   node.addEventListener('mousedown', (e: MouseEvent) => {
     // Skip if space-pan mode is active
     if (spaceDown) return;
-    if ((e.target as HTMLElement).closest('.node-header, .node-output')) {
+    if ((e.target as HTMLElement).closest('.node-body')) {
       isDragging = true;
       // Initial position is already in content space (style.left/top set in content space)
       startX = e.clientX;
@@ -1129,19 +1155,25 @@ export function loadWorkflowState(state: any): void {
     const name = config?.nodeName || id;
 
     const node = document.createElement('div');
+    const _category = RESOURCE_CATEGORY[type] || 'default';
+    const _iconWrapStyle = RESOURCE_ICON_BG[type]
+      ? `background:${RESOURCE_ICON_BG[type]}`
+      : '';
     node.className = 'canvas-node';
     node.id = id;
     node.setAttribute('data-resource-type', type);
+    node.setAttribute('data-category', _category);
     node.style.left = `${position.x}px`;
     node.style.top = `${position.y}px`;
 
     node.innerHTML = `
       <div class="node-port node-port-in" data-port="in"></div>
-      <div class="node-header">
-        <span class="node-type">${resource.terraformType}</span>
+      <div class="node-body">
+        <div class="node-icon-wrap" ${_iconWrapStyle ? `style="${_iconWrapStyle}"` : ''}>
+          <img src="/icons/aws/${type}.svg" width="44" height="44" alt="${type}" draggable="false">
+        </div>
         <span class="node-name">${name}</span>
       </div>
-      <div class="node-output">output: ${resource.type}.id</div>
       <div class="node-port node-port-out" data-port="out"></div>
     `;
 
@@ -1248,9 +1280,22 @@ function getPortPos(nodeId: string, port: 'in' | 'out'): { x: number; y: number 
   };
 }
 
-function makeBezierPath(x1: number, y1: number, x2: number, y2: number): string {
-  const cp = Math.max(60, Math.abs(x2 - x1) * 0.5);
-  return `M ${x1},${y1} C ${x1 + cp},${y1} ${x2 - cp},${y2} ${x2},${y2}`;
+function makeConnectionPath(x1: number, y1: number, x2: number, y2: number): string {
+  const r = 7;
+  const dy = y2 - y1;
+  if (Math.abs(dy) < 3) return `M ${x1},${y1} H ${x2}`;
+
+  const sign = dy > 0 ? 1 : -1;
+  if (x2 >= x1 + 2 * r) {
+    const midX = (x1 + x2) / 2;
+    const sw1 = sign > 0 ? 1 : 0;
+    const sw2 = sign > 0 ? 0 : 1;
+    return `M ${x1},${y1} H ${midX - r} A ${r},${r} 0 0,${sw1} ${midX},${y1 + sign * r} V ${y2 - sign * r} A ${r},${r} 0 0,${sw2} ${midX + r},${y2} H ${x2}`;
+  }
+  // Backward connection — bypass route
+  const bypass = 50;
+  const midY = (y1 + y2) / 2;
+  return `M ${x1},${y1} H ${x1 + bypass} V ${midY} H ${x2 - bypass} V ${y2} H ${x2}`;
 }
 
 function renderConnections(): void {
@@ -1264,7 +1309,7 @@ function renderConnections(): void {
     if (!fromPos || !toPos) return;
 
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path.setAttribute('d', makeBezierPath(fromPos.x, fromPos.y, toPos.x, toPos.y));
+    path.setAttribute('d', makeConnectionPath(fromPos.x, fromPos.y, toPos.x, toPos.y));
     path.setAttribute('data-connection-id', conn.id);
     path.setAttribute('pointer-events', 'visibleStroke');
     path.classList.add('connection-path');
@@ -1335,7 +1380,7 @@ function setupPortDrag(): void {
     // Convert mouse screen position → canvas content space
     const toX = (e.clientX - viewportRect.left - panX) / zoom;
     const toY = (e.clientY - viewportRect.top - panY) / zoom;
-    ghostPath.setAttribute('d', makeBezierPath(fromPos.x, fromPos.y, toX, toY));
+    ghostPath.setAttribute('d', makeConnectionPath(fromPos.x, fromPos.y, toX, toY));
   });
 
   document.addEventListener('mouseup', (e: MouseEvent) => {

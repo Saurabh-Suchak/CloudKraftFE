@@ -1194,20 +1194,21 @@ export const WorkflowDesigner = (): string => {
                 <svg class="canvas-grid" width="3000" height="2000">
                   <defs>
                     <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
-                      <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#e2e8f0" stroke-width="1"/>
+                      <circle cx="0.5" cy="0.5" r="0.9" fill="#b0bec5" fill-opacity="0.55"/>
                     </pattern>
                   </defs>
-                  <rect width="3000" height="2000" fill="url(#grid)" />
+                  <rect width="3000" height="2000" fill="#f7f8fa"/>
+                  <rect width="3000" height="2000" fill="url(#grid)"/>
                 </svg>
 
                 <!-- SVG layer for node connections -->
                 <svg class="connections-layer" id="connectionsLayer">
                   <defs>
-                    <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
-                      <polygon points="0 0, 8 3, 0 6" fill="#3b82f6"/>
+                    <marker id="arrow" markerWidth="9" markerHeight="8" refX="8" refY="4" orient="auto">
+                      <path d="M0,0.5 L0,7.5 L8.5,4 Z" fill="#475569"/>
                     </marker>
-                    <marker id="arrow-selected" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
-                      <polygon points="0 0, 8 3, 0 6" fill="#f59e0b"/>
+                    <marker id="arrow-selected" markerWidth="9" markerHeight="8" refX="8" refY="4" orient="auto">
+                      <path d="M0,0.5 L0,7.5 L8.5,4 Z" fill="#f59e0b"/>
                     </marker>
                   </defs>
                 </svg>
