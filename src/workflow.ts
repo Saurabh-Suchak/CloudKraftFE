@@ -794,6 +794,11 @@ function updateConfigPanel(resourceType: string | null): void {
           <label class="form-label">Description</label>
           <input type="text" class="form-input" id="nodeDescription" placeholder="Allow SSH access" />
         </div>
+        <div class="form-group">
+          <label class="form-label">Ingress CIDR (SSH)</label>
+          <input type="text" class="form-input" id="nodeIngressCidr" placeholder="0.0.0.0/0" />
+          <small style="color:#888;font-size:11px;">Restrict to your IP, e.g. 203.0.113.5/32</small>
+        </div>
       `;
       break;
     case 'internetgateway':

@@ -226,7 +226,8 @@ async function initDashboard(): Promise<void> {
       const name = btn.getAttribute('data-name') || 'this project';
 
       const activeDepls = deployments.filter(
-        (d: any) => d.workflow_id === id && d.status === 'succeeded'
+        (d: any) => d.status === 'succeeded' &&
+          (d.workflow_id === id || d.workflow_name === name)
       );
 
       const confirmMsg = activeDepls.length > 0
