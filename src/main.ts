@@ -33,7 +33,7 @@ router.addRoute('*', NotFound);
 const PUBLIC_ROUTES = new Set(['/', '/login', '/signup', '/signup-aws']);
 
 function isSessionActive(): boolean {
-  return document.cookie.split(';').some(c => c.trim().startsWith('session_active='));
+  return !!localStorage.getItem('auth_token');
 }
 
 router.setGuard((to: string) => {
@@ -149,20 +149,30 @@ async function initDashboard(): Promise<void> {
   const workflows: any[] = result.data || [];
   workflowsCache = workflows;
 
-  // Build map: workflow_id → latest deployment status
+  // Build maps: workflow_id → latest status, workflow_name → latest status (fallback for null workflow_id)
   const deployments: any[] = deplResult.data || [];
   const latestDeployStatus = new Map<number, string>();
+  const latestDeployStatusByName = new Map<string, string>();
   for (const d of deployments) {
+    const ts = d.started_at ? new Date(d.started_at).getTime() : 0;
     if (d.workflow_id != null) {
       const existing = latestDeployStatus.get(d.workflow_id);
-      if (!existing || new Date(d.started_at) > new Date(deployments.find((x: any) => x.status === existing && x.workflow_id === d.workflow_id)?.started_at || 0)) {
+      const existingTs = deployments.find((x: any) => x.workflow_id === d.workflow_id && x.status === existing)?.started_at;
+      if (!existing || ts > (existingTs ? new Date(existingTs).getTime() : 0)) {
         latestDeployStatus.set(d.workflow_id, d.status);
+      }
+    }
+    if (d.workflow_name) {
+      const existing = latestDeployStatusByName.get(d.workflow_name);
+      const existingTs = deployments.find((x: any) => x.workflow_name === d.workflow_name && x.status === existing)?.started_at;
+      if (!existing || ts > (existingTs ? new Date(existingTs).getTime() : 0)) {
+        latestDeployStatusByName.set(d.workflow_name, d.status);
       }
     }
   }
 
-  const deployStatusBadge = (wfId: number): string => {
-    const status = latestDeployStatus.get(wfId);
+  const deployStatusBadge = (wfId: number, wfName?: string): string => {
+    const status = latestDeployStatus.get(wfId) ?? (wfName ? latestDeployStatusByName.get(wfName) : undefined);
     if (!status) return '<span class="status-badge status-not-deployed">Not Deployed</span>';
     const cls: Record<string, string> = {
       succeeded: 'status-succeeded',
@@ -192,7 +202,7 @@ async function initDashboard(): Promise<void> {
     <tr>
       <td>${escapeHtml(wf.name)}${wf.description ? `<div class="project-desc">${escapeHtml(wf.description)}</div>` : ''}</td>
       <td>${formatRelativeDate(wf.updated_at || wf.created_at)}</td>
-      <td>${deployStatusBadge(wf.id)}</td>
+      <td>${deployStatusBadge(wf.id, wf.name)}</td>
       <td>
         <div class="action-links">
           <button class="action-link" data-action="open" data-id="${wf.id}">
@@ -588,54 +598,39 @@ document.addEventListener('submit', async (e) => {
       Connecting...
     `;
 
-    // Call actual FastAPI Backend
-    const payload = {
-      authMethod,
-      accessKey: accessKey || null,
-      secretKey: secretKey || null,
-      roleArn: roleArn || null,
-      externalId: externalId || null,
-      region,
-      email: (form.querySelector('#email') as HTMLInputElement)?.value.trim() || 'user@example.com',
-      fullName: (form.querySelector('#fullName') as HTMLInputElement)?.value.trim() || 'User'
-    };
+    const email = (form.querySelector('#email') as HTMLInputElement)?.value.trim() || 'user@example.com';
+    const fullName = (form.querySelector('#fullName') as HTMLInputElement)?.value.trim() || 'User';
 
-    fetch('http://localhost:8000/api/aws/connect', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    })
-    .then(async (response) => {
-      if (!response.ok) {
-        let errMessage = 'Failed to connect to AWS';
-        try {
-          const err = await response.json();
-          errMessage = err.detail || errMessage;
-        } catch { /* non-JSON response */ }
-        throw new Error(errMessage);
-      }
-      return response.json();
-    })
-    .then((data) => {
-      localStorage.setItem('aws_connected', 'true');
-      localStorage.setItem('aws_region', data.region);
-      router.navigate('/dashboard');
-    })
-    .catch((error) => {
-      // Remove any existing error messages
+    const showSignupError = (message: string) => {
       const existingError = form.querySelector('.error-message');
       if (existingError) existingError.remove();
-
-      // Show inline error message
       const errorDiv = document.createElement('div');
       errorDiv.className = 'error-message';
       errorDiv.style.cssText = 'color:#ff4d4f;background:rgba(255,77,79,0.1);padding:10px;border-radius:4px;margin-bottom:15px;border:1px solid #ff4d4f;font-size:14px;';
-      errorDiv.innerText = error.message;
-
+      errorDiv.innerText = message;
       form.insertBefore(errorDiv, submitBtn);
       submitBtn.disabled = false;
       submitBtn.innerHTML = originalBtnContent;
-    });
+    };
+
+    let result: { data?: { access_token?: string; region?: string }; error?: string };
+
+    if (authMethod === 'access_key') {
+      result = await apiService.registerWithAWS(email, fullName, accessKey!, secretKey!, region);
+    } else {
+      result = await apiService.authWithAWSRole(email, fullName, roleArn!, externalId!, region);
+    }
+
+    if (result.error) {
+      showSignupError(result.error);
+      return;
+    }
+
+    const userResult = await apiService.getCurrentUser();
+    if (userResult.data) localStorage.setItem('current_user', JSON.stringify(userResult.data));
+    localStorage.setItem('aws_connected', 'true');
+    localStorage.setItem('aws_region', region);
+    router.navigate('/dashboard');
   }
 
   // ── AWS Connect form ──────────────────────────────────────────────────────────
@@ -811,8 +806,6 @@ async function initAWSConnect(): Promise<void> {
 
 // ─── Deployments list ─────────────────────────────────────────────────────────
 
-const API_BASE_DEPLOY = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-
 function deplStatusClass(status: string): string {
   if (status === 'succeeded') return 'success';
   if (status === 'failed') return 'error';
@@ -828,9 +821,9 @@ async function initDeploymentsList(): Promise<void> {
     container.innerHTML = '<div class="deployments-loading">Loading deployments...</div>';
 
     try {
-      const res = await fetch(`${API_BASE_DEPLOY}/api/deploy/`, { credentials: 'include' });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const deployments: any[] = await res.json();
+      const result = await apiService.listDeployments();
+      if (result.error) throw new Error(result.error);
+      const deployments: any[] = result.data || [];
 
       if (deployments.length === 0) {
         container.innerHTML = `
@@ -901,18 +894,13 @@ async function initDeploymentsList(): Promise<void> {
       target.textContent = 'Destroying...';
 
       try {
-        const res = await fetch(`${API_BASE_DEPLOY}/api/deploy/${id}/destroy`, {
-          method: 'POST',
-          credentials: 'include',
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({ detail: 'Unknown error' }));
-          alert(`Destroy failed: ${err.detail}`);
+        const result = await apiService.destroyDeployment(parseInt(id));
+        if (result.error) {
+          alert(`Destroy failed: ${result.error}`);
           target.removeAttribute('disabled');
           target.textContent = 'Destroy';
           return;
         }
-        // Navigate to detail page to watch destroy logs
         const { router } = await import('./router');
         router.navigate(`/deployment?id=${id}`);
       } catch (err) {
