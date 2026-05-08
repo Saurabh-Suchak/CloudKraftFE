@@ -37,16 +37,13 @@ function escHtml(str: string): string {
 }
 
 function showDestroyBtn(deploymentId: number): void {
-  const actions = document.querySelector('.deployment-actions');
-  if (!actions || document.getElementById('destroyBtn')) return;
-  const btn = document.createElement('button');
-  btn.id = 'destroyBtn';
-  btn.className = 'btn btn-outline';
-  btn.style.color = '#ef4444';
-  btn.style.borderColor = '#ef4444';
-  btn.textContent = 'Destroy Resources';
-  btn.addEventListener('click', () => runDestroy(deploymentId));
-  actions.insertBefore(btn, actions.firstChild);
+  const btn = document.getElementById('destroyBtn') as HTMLButtonElement | null;
+  if (!btn) return;
+  btn.style.display = '';
+  // Replace with fresh clone to avoid stacking listeners across re-renders
+  const fresh = btn.cloneNode(true) as HTMLButtonElement;
+  btn.replaceWith(fresh);
+  fresh.addEventListener('click', () => runDestroy(deploymentId));
 }
 
 export function initDeployment(): void {
@@ -274,7 +271,8 @@ async function loadExistingDeployment(deploymentId: number): Promise<void> {
 }
 
 async function runDestroy(deploymentId: number): Promise<void> {
-  if (!confirm('This will destroy all AWS resources created by this deployment. Continue?')) return;
+  if (!confirm('Destroy all AWS resources in this deployment?\n\nAll cloud infrastructure created by this deployment will be permanently removed.')) return;
+  if (!confirm('⚠️ Final confirmation — this cannot be undone.\n\nAre you absolutely sure you want to destroy these resources?')) return;
 
   const logsEl = document.getElementById('deploymentLogs');
   const destroyBtn = document.getElementById('destroyBtn') as HTMLButtonElement | null;

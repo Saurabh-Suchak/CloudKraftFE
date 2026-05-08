@@ -8,6 +8,7 @@ import { CodeViewer } from './pages/CodeViewer';
 import { DeploymentStatus } from './pages/DeploymentStatus';
 import { AWSConnect } from './pages/AWSConnect';
 import { DeploymentsList } from './pages/DeploymentsList';
+import { Profile } from './pages/Profile';
 import { NotFound } from './pages/NotFound';
 import './styles/main.css';
 import { reinitWorkflowDesigner, resetWorkflowDesignerInit, loadWorkflowState } from './workflow';
@@ -26,6 +27,7 @@ router.addRoute('/code', CodeViewer);
 router.addRoute('/deployment', DeploymentStatus);
 router.addRoute('/aws-connect', AWSConnect);
 router.addRoute('/deployments', DeploymentsList);
+router.addRoute('/profile', Profile);
 router.addRoute('*', NotFound);
 
 const PUBLIC_ROUTES = new Set(['/', '/login', '/signup', '/signup-aws']);
@@ -75,6 +77,7 @@ function setDesignerTitle(name: string | null | undefined): void {
 let dashboardInitialized = false;
 let codeViewerInitialized = false;
 let deploymentInitialized = false;
+let profileInitialized = false;
 let workflowsCache: any[] = [];
 
 function formatRelativeDate(dateStr: string): string {
@@ -123,7 +126,7 @@ async function initDashboard(): Promise<void> {
       bannerRight.innerHTML = connected
         ? `Region: <strong>${awsStatus.data?.region || '—'}</strong>
            &nbsp;|&nbsp; Auth: <strong>${awsStatus.data?.auth_method === 'assume_role' ? 'IAM Role' : 'Access Keys'}</strong>`
-        : `<a href="/aws-connect" data-navigate="/aws-connect" class="aws-banner-link">Connect AWS →</a>`;
+        : `<a href="/profile" data-navigate="/profile" class="aws-banner-link">Connect AWS →</a>`;
     }
   }
 
@@ -271,6 +274,7 @@ function onRouteChange(): void {
   dashboardInitialized = false;
   codeViewerInitialized = false;
   deploymentInitialized = false;
+  profileInitialized = false;
 
   if (document.getElementById('workflowCanvas')) {
     reinitWorkflowDesigner();
@@ -370,6 +374,11 @@ function onRouteChange(): void {
 
   if (document.getElementById('deploymentsContainer')) {
     initDeploymentsList();
+  }
+
+  if (document.querySelector('.profile-main')) {
+    profileInitialized = true;
+    initProfile();
   }
 }
 
@@ -734,18 +743,44 @@ async function initAWSConnect(): Promise<void> {
     if (extIdHidden)  extIdHidden.value = status.data.external_id;
   }
 
+  const disconnectSection = document.getElementById('awsDisconnectSection');
+  const disconnectBtn     = document.getElementById('awsDisconnectBtn') as HTMLButtonElement | null;
+
   if (status.data?.connected) {
     banner.className = 'aws-status-banner aws-status-connected';
     const method = status.data.auth_method === 'assume_role' ? 'IAM Role' : 'Access Keys';
     bannerTxt.textContent = `Connected · ${method} · ${status.data.region}`;
     if (regionSel && status.data.region) regionSel.value = status.data.region;
-    // Pre-select the radio matching saved auth method
     const matchingRadio = document.querySelector<HTMLInputElement>(`input[name="authMethod"][value="${status.data.auth_method}"]`);
     if (matchingRadio) { matchingRadio.checked = true; toggleSections(status.data.auth_method); }
+    if (disconnectSection) disconnectSection.style.display = 'block';
   } else {
     banner.className = 'aws-status-banner aws-status-disconnected';
     bannerTxt.textContent = 'Not connected — enter credentials below to connect';
+    if (disconnectSection) disconnectSection.style.display = 'none';
   }
+
+  disconnectBtn?.addEventListener('click', async () => {
+    if (!confirm('Disconnect your AWS account? You will need to reconnect to deploy infrastructure.')) return;
+    disconnectBtn.disabled = true;
+    disconnectBtn.textContent = 'Disconnecting...';
+
+    const result = await apiService.disconnectAWS();
+    if (result.error) {
+      alert(`Disconnect failed: ${result.error}`);
+      disconnectBtn.disabled = false;
+      disconnectBtn.textContent = 'Disconnect AWS Account';
+      return;
+    }
+
+    localStorage.removeItem('aws_connected');
+    localStorage.removeItem('aws_region');
+    banner.className = 'aws-status-banner aws-status-disconnected';
+    bannerTxt.textContent = 'Not connected — enter credentials below to connect';
+    if (disconnectSection) disconnectSection.style.display = 'none';
+    disconnectBtn.disabled = false;
+    disconnectBtn.textContent = 'Disconnect AWS Account';
+  });
 }
 
 // ─── Deployments list ─────────────────────────────────────────────────────────
@@ -872,5 +907,198 @@ async function initDeploymentsList(): Promise<void> {
         target.textContent = 'Destroy';
       }
     }
+  });
+}
+
+// ─── Profile page ─────────────────────────────────────────────────────────────
+
+async function initProfile(): Promise<void> {
+  if (!document.querySelector('.profile-main')) return;
+
+  const setFeedback = (id: string, msg: string, isError: boolean) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = msg;
+    el.style.color = isError ? '#ef4444' : '#22c55e';
+    if (msg) setTimeout(() => { el.textContent = ''; }, 4000);
+  };
+
+  // Password visibility toggles
+  document.querySelectorAll<HTMLButtonElement>('.input-toggle-btn[data-toggle]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const inputId = btn.getAttribute('data-toggle');
+      if (!inputId) return;
+      const input = document.getElementById(inputId) as HTMLInputElement | null;
+      if (input) input.type = input.type === 'password' ? 'text' : 'password';
+    });
+  });
+
+  // Load current user data into form
+  const userResult = await apiService.getCurrentUser();
+  if (userResult.data) {
+    const u = userResult.data as any;
+    const nameInput = document.getElementById('profileFullName') as HTMLInputElement | null;
+    const emailInput = document.getElementById('profileEmail') as HTMLInputElement | null;
+    if (nameInput) nameInput.value = u.full_name || '';
+    if (emailInput) emailInput.value = u.email || '';
+
+    const userIdEl = document.getElementById('profileUserId');
+    if (userIdEl) userIdEl.textContent = String(u.id);
+
+    const memberSinceEl = document.getElementById('profileMemberSince');
+    if (memberSinceEl && u.created_at) {
+      memberSinceEl.textContent = new Date(u.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+    }
+  }
+
+  // Load AWS status
+  const awsStatusEl = document.getElementById('profileAwsStatus');
+  const profileDisconnectSection = document.getElementById('profileDisconnectSection');
+  const profileDisconnectBtn = document.getElementById('profileDisconnectBtn') as HTMLButtonElement | null;
+
+  const refreshAwsStatus = async () => {
+    if (!awsStatusEl) return;
+    const awsResult = await apiService.getAWSStatus();
+    const aws = awsResult.data;
+    if (aws?.connected) {
+      const method = aws.auth_method === 'assume_role' ? 'IAM Role Assumption' : 'Access Keys';
+      awsStatusEl.innerHTML = `
+        <div class="profile-aws-connected">
+          <span class="profile-aws-dot connected"></span>
+          <div class="profile-aws-info">
+            <strong>Connected</strong>
+            <div class="profile-aws-details">
+              <span>Auth: ${method}</span>
+              <span>·</span>
+              <span>Region: ${aws.region || '—'}</span>
+              ${aws.role_arn ? `<span>·</span><span class="profile-aws-arn">Role: ${aws.role_arn}</span>` : ''}
+            </div>
+          </div>
+          <a href="/aws-connect" data-navigate="/aws-connect" class="btn btn-outline btn-sm">Manage</a>
+        </div>`;
+      if (profileDisconnectSection) profileDisconnectSection.style.display = 'block';
+    } else {
+      awsStatusEl.innerHTML = `
+        <div class="profile-aws-connected">
+          <span class="profile-aws-dot disconnected"></span>
+          <div class="profile-aws-info">
+            <strong>Not Connected</strong>
+            <div class="profile-aws-details">Link your AWS account to enable deployments.</div>
+          </div>
+          <a href="/aws-connect" data-navigate="/aws-connect" class="btn btn-primary btn-sm">Connect AWS</a>
+        </div>`;
+      if (profileDisconnectSection) profileDisconnectSection.style.display = 'none';
+    }
+  };
+
+  await refreshAwsStatus();
+
+  profileDisconnectBtn?.addEventListener('click', async () => {
+    if (!confirm('Disconnect your AWS account? You will need to reconnect to deploy infrastructure.')) return;
+    profileDisconnectBtn.disabled = true;
+    profileDisconnectBtn.textContent = 'Disconnecting...';
+    const result = await apiService.disconnectAWS();
+    profileDisconnectBtn.disabled = false;
+    profileDisconnectBtn.textContent = 'Disconnect AWS Account';
+    if (result.error) { alert(`Disconnect failed: ${result.error}`); return; }
+    localStorage.removeItem('aws_connected');
+    localStorage.removeItem('aws_region');
+    await refreshAwsStatus();
+  });
+
+  // Load env vars status
+  const envResult = await apiService.getEnvVars();
+  const keyStatusEl = document.getElementById('anthropicKeyStatus');
+  if (keyStatusEl && envResult.data) {
+    if (envResult.data.anthropic_api_key_set) {
+      keyStatusEl.innerHTML = `<span class="profile-key-active">Current key: ${envResult.data.anthropic_api_key_preview || '****'}</span>`;
+    } else {
+      keyStatusEl.innerHTML = `<span class="profile-key-none">No key set — server default will be used if available</span>`;
+    }
+  }
+
+  // Edit profile form
+  document.getElementById('editProfileForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('editProfileBtn') as HTMLButtonElement;
+    const name = (document.getElementById('profileFullName') as HTMLInputElement)?.value.trim();
+    const email = (document.getElementById('profileEmail') as HTMLInputElement)?.value.trim();
+    if (!email) { setFeedback('editProfileFeedback', 'Email is required.', true); return; }
+
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+    const result = await apiService.updateProfile(name, email);
+    btn.disabled = false;
+    btn.textContent = 'Save Changes';
+
+    if (result.error) {
+      setFeedback('editProfileFeedback', result.error, true);
+      return;
+    }
+    // Update localStorage so sidebar reflects new name/email immediately
+    const stored = JSON.parse(localStorage.getItem('current_user') || '{}');
+    const updated = { ...stored, full_name: result.data?.full_name, email: result.data?.email };
+    localStorage.setItem('current_user', JSON.stringify(updated));
+    updateUserDisplay();
+    setFeedback('editProfileFeedback', 'Profile updated!', false);
+  });
+
+  // Change password form
+  document.getElementById('changePasswordForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('changePasswordBtn') as HTMLButtonElement;
+    const current = (document.getElementById('currentPassword') as HTMLInputElement)?.value;
+    const newPwd  = (document.getElementById('newPassword') as HTMLInputElement)?.value;
+    const confirm = (document.getElementById('confirmNewPassword') as HTMLInputElement)?.value;
+
+    if (!current || !newPwd || !confirm) { setFeedback('changePasswordFeedback', 'All fields are required.', true); return; }
+    if (newPwd !== confirm) { setFeedback('changePasswordFeedback', 'New passwords do not match.', true); return; }
+    if (newPwd.length < 8) { setFeedback('changePasswordFeedback', 'Password must be at least 8 characters.', true); return; }
+
+    btn.disabled = true;
+    btn.textContent = 'Updating...';
+    const result = await apiService.changePassword(current, newPwd);
+    btn.disabled = false;
+    btn.textContent = 'Update Password';
+
+    if (result.error) { setFeedback('changePasswordFeedback', result.error, true); return; }
+
+    (document.getElementById('currentPassword') as HTMLInputElement).value = '';
+    (document.getElementById('newPassword') as HTMLInputElement).value = '';
+    (document.getElementById('confirmNewPassword') as HTMLInputElement).value = '';
+    setFeedback('changePasswordFeedback', 'Password updated successfully!', false);
+  });
+
+  // Env vars form
+  document.getElementById('envVarsForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('saveEnvVarsBtn') as HTMLButtonElement;
+    const key = (document.getElementById('anthropicApiKey') as HTMLInputElement)?.value.trim();
+    if (!key) { setFeedback('envVarsFeedback', 'Enter an API key to save.', true); return; }
+
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+    const result = await apiService.updateEnvVars(key);
+    btn.disabled = false;
+    btn.textContent = 'Save Key';
+
+    if (result.error) { setFeedback('envVarsFeedback', result.error, true); return; }
+
+    (document.getElementById('anthropicApiKey') as HTMLInputElement).value = '';
+    if (keyStatusEl && result.data) {
+      keyStatusEl.innerHTML = `<span class="profile-key-active">Current key: ${result.data.anthropic_api_key_preview || '****'}</span>`;
+    }
+    setFeedback('envVarsFeedback', 'API key saved!', false);
+  });
+
+  // Clear Anthropic key
+  document.getElementById('clearAnthropicKeyBtn')?.addEventListener('click', async () => {
+    if (!confirm('Remove your Anthropic API key? The server default will be used instead.')) return;
+    const result = await apiService.updateEnvVars(null);
+    if (result.error) { setFeedback('envVarsFeedback', result.error, true); return; }
+    if (keyStatusEl) {
+      keyStatusEl.innerHTML = `<span class="profile-key-none">No key set — server default will be used if available</span>`;
+    }
+    setFeedback('envVarsFeedback', 'API key removed.', false);
   });
 }

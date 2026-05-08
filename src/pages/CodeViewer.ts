@@ -20,13 +20,6 @@ export const CodeViewer = (): string => {
             </svg>
             <span>Projects</span>
           </a>
-          <a href="/aws-connect" data-navigate="/aws-connect" class="nav-item">
-            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M20 16.2A4.5 4.5 0 0 0 17.5 8h-1.8A7 7 0 1 0 4 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M12 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0-2 0M12 13v4M10 19h4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            <span>AWS Connect</span>
-          </a>
           <a href="/workflow" data-navigate="/workflow" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/>
@@ -47,13 +40,15 @@ export const CodeViewer = (): string => {
         </nav>
 
         <div class="sidebar-footer">
-          <div class="user-profile">
-            <div class="user-avatar" data-user-avatar>U</div>
-            <div class="user-info">
-              <div class="user-name" data-user-name>User</div>
-              <div class="user-email" data-user-email></div>
+          <a href="/profile" data-navigate="/profile" class="user-profile-link">
+            <div class="user-profile">
+              <div class="user-avatar" data-user-avatar>U</div>
+              <div class="user-info">
+                <div class="user-name" data-user-name>User</div>
+                <div class="user-email" data-user-email></div>
+              </div>
             </div>
-          </div>
+          </a>
           <button class="btn-logout" id="logoutBtn">
             <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M9 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>

@@ -101,7 +101,34 @@ class ApiService {
   }
 
   async getCurrentUser() {
-    return this.request('/api/auth/me');
+    return this.request<{ id: number; email: string; full_name: string | null; created_at: string }>('/api/auth/me');
+  }
+
+  async updateProfile(fullName: string, email: string) {
+    return this.request<{ id: number; email: string; full_name: string | null; created_at: string }>(
+      '/api/auth/profile',
+      { method: 'PUT', body: JSON.stringify({ full_name: fullName, email }) }
+    );
+  }
+
+  async changePassword(currentPassword: string, newPassword: string) {
+    return this.request<{ message: string }>(
+      '/api/auth/password',
+      { method: 'PUT', body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }) }
+    );
+  }
+
+  async getEnvVars() {
+    return this.request<{ anthropic_api_key_set: boolean; anthropic_api_key_preview: string | null }>(
+      '/api/auth/env-vars'
+    );
+  }
+
+  async updateEnvVars(anthropicApiKey: string | null) {
+    return this.request<{ anthropic_api_key_set: boolean; anthropic_api_key_preview: string | null }>(
+      '/api/auth/env-vars',
+      { method: 'PUT', body: JSON.stringify({ anthropic_api_key: anthropicApiKey }) }
+    );
   }
 
   logout() {
@@ -210,8 +237,16 @@ class ApiService {
     return this.request<any>(`/api/deploy/${id}/destroy`, { method: 'POST' });
   }
 
+  async destroyAllDeployments() {
+    return this.request<{ message: string; count: number }>('/api/deploy/destroy-all', { method: 'POST' });
+  }
+
   async getDeploymentLogs(id: number, afterId = 0) {
     return this.request<{ logs: any[]; deployment_status: string }>(`/api/deploy/${id}/logs?after_id=${afterId}`);
+  }
+
+  async disconnectAWS() {
+    return this.request<{ message: string }>('/api/auth/disconnect-aws', { method: 'POST' });
   }
 
   async getAWSStatus() {

@@ -2651,3 +2651,254 @@ body {
   color: #333;
   border-color: #333;
 }
+
+/* ─── Sidebar user-profile clickable link ────────────────────────────────── */
+.user-profile-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  border-radius: 0.5rem;
+  transition: background 0.15s;
+}
+.user-profile-link:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* ─── Profile page ───────────────────────────────────────────────────────── */
+.profile-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  background: var(--bg-secondary, #f8fafc);
+}
+
+.profile-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 2rem;
+  background: var(--bg-primary, #fff);
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+}
+
+.profile-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1.5rem 2rem;
+  max-width: 720px;
+}
+
+.profile-card {
+  background: var(--bg-primary, #fff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+}
+
+.profile-card-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text-primary, #1e293b);
+  margin: 0 0 1rem 0;
+}
+
+.profile-card-desc {
+  font-size: 0.8125rem;
+  color: var(--text-secondary, #64748b);
+  margin: -0.5rem 0 1rem 0;
+}
+
+.profile-card-header {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.profile-avatar-large {
+  width: 4rem;
+  height: 4rem;
+  border-radius: 50%;
+  background: var(--primary, #2563eb);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.profile-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.profile-display-name {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary, #1e293b);
+}
+
+.profile-display-email {
+  font-size: 0.875rem;
+  color: var(--text-secondary, #64748b);
+}
+
+.profile-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.profile-meta-item {
+  font-size: 0.75rem;
+  color: var(--text-tertiary, #94a3b8);
+}
+
+.profile-meta-sep {
+  color: var(--text-tertiary, #94a3b8);
+  font-size: 0.75rem;
+}
+
+.profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.profile-form-footer {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  padding-top: 0.5rem;
+}
+
+.profile-form-feedback {
+  font-size: 0.8125rem;
+  flex: 1;
+}
+
+.input-with-toggle {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-with-toggle .form-input {
+  flex: 1;
+  padding-right: 2.5rem;
+}
+
+.input-toggle-btn {
+  position: absolute;
+  right: 0.75rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary, #64748b);
+  padding: 0;
+  display: flex;
+  align-items: center;
+}
+
+.input-toggle-btn:hover {
+  color: var(--text-primary, #1e293b);
+}
+
+.form-label-hint {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--text-secondary, #64748b);
+  margin-top: 0.125rem;
+}
+
+.profile-key-status {
+  margin-top: 0.375rem;
+  font-size: 0.8125rem;
+}
+
+.profile-key-active {
+  color: #16a34a;
+}
+
+.profile-key-none {
+  color: var(--text-secondary, #64748b);
+}
+
+.profile-aws-status {
+  margin-top: 0.25rem;
+}
+
+.profile-aws-connected {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.profile-aws-dot {
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.profile-aws-dot.connected {
+  background: #22c55e;
+}
+
+.profile-aws-dot.disconnected {
+  background: #94a3b8;
+}
+
+.profile-aws-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.profile-aws-details {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  font-size: 0.8125rem;
+  color: var(--text-secondary, #64748b);
+}
+
+.profile-aws-arn {
+  font-family: monospace;
+  font-size: 0.75rem;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-loading {
+  color: var(--text-secondary, #64748b);
+  font-size: 0.875rem;
+}
+
+.btn-sm {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8125rem;
+}
+
+.btn-danger-outline {
+  color: #ef4444;
+  border-color: #ef4444;
+  background: transparent;
+}
+
+.btn-danger-outline:hover {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: #dc2626;
+  color: #dc2626;
+}
