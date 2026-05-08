@@ -588,54 +588,39 @@ document.addEventListener('submit', async (e) => {
       Connecting...
     `;
 
-    // Call actual FastAPI Backend
-    const payload = {
-      authMethod,
-      accessKey: accessKey || null,
-      secretKey: secretKey || null,
-      roleArn: roleArn || null,
-      externalId: externalId || null,
-      region,
-      email: (form.querySelector('#email') as HTMLInputElement)?.value.trim() || 'user@example.com',
-      fullName: (form.querySelector('#fullName') as HTMLInputElement)?.value.trim() || 'User'
-    };
+    const email = (form.querySelector('#email') as HTMLInputElement)?.value.trim() || 'user@example.com';
+    const fullName = (form.querySelector('#fullName') as HTMLInputElement)?.value.trim() || 'User';
 
-    fetch('http://localhost:8000/api/aws/connect', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    })
-    .then(async (response) => {
-      if (!response.ok) {
-        let errMessage = 'Failed to connect to AWS';
-        try {
-          const err = await response.json();
-          errMessage = err.detail || errMessage;
-        } catch { /* non-JSON response */ }
-        throw new Error(errMessage);
-      }
-      return response.json();
-    })
-    .then((data) => {
-      localStorage.setItem('aws_connected', 'true');
-      localStorage.setItem('aws_region', data.region);
-      router.navigate('/dashboard');
-    })
-    .catch((error) => {
-      // Remove any existing error messages
+    const showSignupError = (message: string) => {
       const existingError = form.querySelector('.error-message');
       if (existingError) existingError.remove();
-
-      // Show inline error message
       const errorDiv = document.createElement('div');
       errorDiv.className = 'error-message';
       errorDiv.style.cssText = 'color:#ff4d4f;background:rgba(255,77,79,0.1);padding:10px;border-radius:4px;margin-bottom:15px;border:1px solid #ff4d4f;font-size:14px;';
-      errorDiv.innerText = error.message;
-
+      errorDiv.innerText = message;
       form.insertBefore(errorDiv, submitBtn);
       submitBtn.disabled = false;
       submitBtn.innerHTML = originalBtnContent;
-    });
+    };
+
+    let result: { data?: { access_token?: string; region?: string }; error?: string };
+
+    if (authMethod === 'access_key') {
+      result = await apiService.registerWithAWS(email, fullName, accessKey!, secretKey!, region);
+    } else {
+      result = await apiService.authWithAWSRole(email, fullName, roleArn!, externalId!, region);
+    }
+
+    if (result.error) {
+      showSignupError(result.error);
+      return;
+    }
+
+    const userResult = await apiService.getCurrentUser();
+    if (userResult.data) localStorage.setItem('current_user', JSON.stringify(userResult.data));
+    localStorage.setItem('aws_connected', 'true');
+    localStorage.setItem('aws_region', region);
+    router.navigate('/dashboard');
   }
 
   // ── AWS Connect form ──────────────────────────────────────────────────────────

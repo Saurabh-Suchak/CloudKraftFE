@@ -100,6 +100,29 @@ class ApiService {
     return result;
   }
 
+  async authWithAWSRole(
+    email: string,
+    fullName: string,
+    roleArn: string,
+    externalId: string,
+    region: string
+  ) {
+    const result = await this.request<{ access_token: string; token_type: string }>('/api/auth/aws-role-auth', {
+      method: 'POST',
+      body: JSON.stringify({
+        email,
+        full_name: fullName,
+        role_arn: roleArn,
+        external_id: externalId,
+        region,
+      }),
+    });
+    if (!result.error && result.data?.access_token) {
+      localStorage.setItem('auth_token', result.data.access_token);
+    }
+    return result;
+  }
+
   async getCurrentUser() {
     return this.request<{ id: number; email: string; full_name: string | null; created_at: string }>('/api/auth/me');
   }
