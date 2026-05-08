@@ -149,20 +149,30 @@ async function initDashboard(): Promise<void> {
   const workflows: any[] = result.data || [];
   workflowsCache = workflows;
 
-  // Build map: workflow_id → latest deployment status
+  // Build maps: workflow_id → latest status, workflow_name → latest status (fallback for null workflow_id)
   const deployments: any[] = deplResult.data || [];
   const latestDeployStatus = new Map<number, string>();
+  const latestDeployStatusByName = new Map<string, string>();
   for (const d of deployments) {
+    const ts = d.started_at ? new Date(d.started_at).getTime() : 0;
     if (d.workflow_id != null) {
       const existing = latestDeployStatus.get(d.workflow_id);
-      if (!existing || new Date(d.started_at) > new Date(deployments.find((x: any) => x.status === existing && x.workflow_id === d.workflow_id)?.started_at || 0)) {
+      const existingTs = deployments.find((x: any) => x.workflow_id === d.workflow_id && x.status === existing)?.started_at;
+      if (!existing || ts > (existingTs ? new Date(existingTs).getTime() : 0)) {
         latestDeployStatus.set(d.workflow_id, d.status);
+      }
+    }
+    if (d.workflow_name) {
+      const existing = latestDeployStatusByName.get(d.workflow_name);
+      const existingTs = deployments.find((x: any) => x.workflow_name === d.workflow_name && x.status === existing)?.started_at;
+      if (!existing || ts > (existingTs ? new Date(existingTs).getTime() : 0)) {
+        latestDeployStatusByName.set(d.workflow_name, d.status);
       }
     }
   }
 
-  const deployStatusBadge = (wfId: number): string => {
-    const status = latestDeployStatus.get(wfId);
+  const deployStatusBadge = (wfId: number, wfName?: string): string => {
+    const status = latestDeployStatus.get(wfId) ?? (wfName ? latestDeployStatusByName.get(wfName) : undefined);
     if (!status) return '<span class="status-badge status-not-deployed">Not Deployed</span>';
     const cls: Record<string, string> = {
       succeeded: 'status-succeeded',
@@ -192,7 +202,7 @@ async function initDashboard(): Promise<void> {
     <tr>
       <td>${escapeHtml(wf.name)}${wf.description ? `<div class="project-desc">${escapeHtml(wf.description)}</div>` : ''}</td>
       <td>${formatRelativeDate(wf.updated_at || wf.created_at)}</td>
-      <td>${deployStatusBadge(wf.id)}</td>
+      <td>${deployStatusBadge(wf.id, wf.name)}</td>
       <td>
         <div class="action-links">
           <button class="action-link" data-action="open" data-id="${wf.id}">
@@ -796,8 +806,6 @@ async function initAWSConnect(): Promise<void> {
 
 // ─── Deployments list ─────────────────────────────────────────────────────────
 
-const API_BASE_DEPLOY = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-
 function deplStatusClass(status: string): string {
   if (status === 'succeeded') return 'success';
   if (status === 'failed') return 'error';
@@ -813,9 +821,9 @@ async function initDeploymentsList(): Promise<void> {
     container.innerHTML = '<div class="deployments-loading">Loading deployments...</div>';
 
     try {
-      const res = await fetch(`${API_BASE_DEPLOY}/api/deploy/`, { credentials: 'include' });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const deployments: any[] = await res.json();
+      const result = await apiService.listDeployments();
+      if (result.error) throw new Error(result.error);
+      const deployments: any[] = result.data || [];
 
       if (deployments.length === 0) {
         container.innerHTML = `
@@ -886,18 +894,13 @@ async function initDeploymentsList(): Promise<void> {
       target.textContent = 'Destroying...';
 
       try {
-        const res = await fetch(`${API_BASE_DEPLOY}/api/deploy/${id}/destroy`, {
-          method: 'POST',
-          credentials: 'include',
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({ detail: 'Unknown error' }));
-          alert(`Destroy failed: ${err.detail}`);
+        const result = await apiService.destroyDeployment(parseInt(id));
+        if (result.error) {
+          alert(`Destroy failed: ${result.error}`);
           target.removeAttribute('disabled');
           target.textContent = 'Destroy';
           return;
         }
-        // Navigate to detail page to watch destroy logs
         const { router } = await import('./router');
         router.navigate(`/deployment?id=${id}`);
       } catch (err) {
