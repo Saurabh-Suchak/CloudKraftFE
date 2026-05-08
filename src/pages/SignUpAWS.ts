@@ -41,37 +41,54 @@ export const SignUpAWS = (): string => {
 
             <!-- Access Key Section -->
             <div id="accessKeySection" class="auth-section" style="display: none;">
-            <div class="form-group">
-              <label for="awsAccessKey" class="form-label">AWS Access Key ID</label>
-              <input 
-                type="text" 
-                id="awsAccessKey" 
-                name="awsAccessKey" 
-                class="form-input" 
-                placeholder="AKIAIOSFODNN7EXAMPLE"
-              />
-              <small class="form-hint">Your AWS Access Key ID</small>
-            </div>
-            
-            <div class="form-group">
-              <label for="awsSecretKey" class="form-label">AWS Secret Access Key</label>
-              <div class="password-input-wrapper">
-                <input 
-                  type="password" 
-                  id="awsSecretKey" 
-                  name="awsSecretKey" 
-                  class="form-input" 
-                  placeholder="Enter your AWS Secret Key"
-                />
-                <button type="button" class="password-toggle" id="awsSecretToggle">
-                  <svg class="eye-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M1 12S5 4 12 4S23 12 23 12S19 20 12 20S1 12 1 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
-                  </svg>
-                </button>
+              <div class="instructions-box">
+                <h4>Step 1: Ensure your IAM user has the required permissions</h4>
+                <p>The IAM user whose credentials you're providing must have sufficient permissions to create and manage AWS resources. Go to <strong>IAM → Users → your user → Add permissions → Attach policies</strong> and attach:</p>
+                <div class="info-block" style="background: var(--surface-100); padding: 12px; border-radius: 6px;">
+                  <p style="margin-bottom: 8px; font-size: 13px;"><strong>Option A — Easiest (recommended for dev/test):</strong></p>
+                  <p style="margin-bottom: 12px; font-size: 13px;">Attach <code class="code-span">AdministratorAccess</code></p>
+                  <p style="margin-bottom: 8px; font-size: 13px;"><strong>Option B — Least privilege (production):</strong></p>
+                  <ul style="margin: 8px 0 0 0; padding-left: 18px; font-size: 13px; color: var(--text-secondary); line-height: 1.8;">
+                    <li><code class="code-span">AmazonEC2FullAccess</code></li>
+                    <li><code class="code-span">AmazonS3FullAccess</code></li>
+                    <li><code class="code-span">AmazonDynamoDBFullAccess</code></li>
+                    <li><code class="code-span">AmazonSQSFullAccess</code></li>
+                    <li><code class="code-span">AWSLambda_FullAccess</code></li>
+                    <li><code class="code-span">IAMFullAccess</code></li>
+                  </ul>
+                </div>
               </div>
-              <small class="form-hint">Your AWS Secret Access Key (keep this secure)</small>
-            </div>
+              <div class="form-group margin-top-1rem">
+                <h4>Step 2: Enter your credentials</h4>
+                <label for="awsAccessKey" class="form-label">AWS Access Key ID</label>
+                <input
+                  type="text"
+                  id="awsAccessKey"
+                  name="awsAccessKey"
+                  class="form-input"
+                  placeholder="AKIAIOSFODNN7EXAMPLE"
+                />
+                <small class="form-hint">Your AWS Access Key ID</small>
+              </div>
+              <div class="form-group">
+                <label for="awsSecretKey" class="form-label">AWS Secret Access Key</label>
+                <div class="password-input-wrapper">
+                  <input
+                    type="password"
+                    id="awsSecretKey"
+                    name="awsSecretKey"
+                    class="form-input"
+                    placeholder="Enter your AWS Secret Key"
+                  />
+                  <button type="button" class="password-toggle" id="awsSecretToggle">
+                    <svg class="eye-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M1 12S5 4 12 4S23 12 23 12S19 20 12 20S1 12 1 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                      <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                  </button>
+                </div>
+                <small class="form-hint">Your AWS Secret Access Key (keep this secure)</small>
+              </div>
             </div> <!-- End Access Key Section -->
 
             <!-- Assume Role Section -->
@@ -105,15 +122,33 @@ export const SignUpAWS = (): string => {
                 </div>
               </div>
 
+              <div class="instructions-box margin-top-1rem">
+                <h4>Step 2: Attach Permissions to the Role</h4>
+                <p>The role needs permissions to create and manage AWS resources. In the role you just created, go to <strong>Add permissions → Attach policies</strong> and attach:</p>
+                <div class="info-block" style="background: var(--surface-100); padding: 12px; border-radius: 6px;">
+                  <p style="margin-bottom: 8px; font-size: 13px;"><strong>Option A — Easiest (recommended for dev/test):</strong></p>
+                  <p style="margin-bottom: 12px; font-size: 13px;">Attach <code class="code-span">AdministratorAccess</code></p>
+                  <p style="margin-bottom: 8px; font-size: 13px;"><strong>Option B — Least privilege (production):</strong></p>
+                  <ul style="margin: 8px 0 0 0; padding-left: 18px; font-size: 13px; color: var(--text-secondary); line-height: 1.8;">
+                    <li><code class="code-span">AmazonEC2FullAccess</code></li>
+                    <li><code class="code-span">AmazonS3FullAccess</code></li>
+                    <li><code class="code-span">AmazonDynamoDBFullAccess</code></li>
+                    <li><code class="code-span">AmazonSQSFullAccess</code></li>
+                    <li><code class="code-span">AWSLambda_FullAccess</code></li>
+                    <li><code class="code-span">IAMFullAccess</code></li>
+                  </ul>
+                </div>
+              </div>
+
               <div class="form-group margin-top-1rem">
-                <h4>Step 2: Enter Role ARN</h4>
+                <h4>Step 3: Enter Role ARN</h4>
                 <p class="instructions-text">Open the role you just created, copy the ARN and paste in the field below.</p>
                 <label for="awsRoleArn" class="form-label">Role ARN</label>
-                <input 
-                  type="text" 
-                  id="awsRoleArn" 
-                  name="awsRoleArn" 
-                  class="form-input" 
+                <input
+                  type="text"
+                  id="awsRoleArn"
+                  name="awsRoleArn"
+                  class="form-input"
                   placeholder="arn:aws:iam::123456789012:role/CloudKraftRole"
                 />
                 <input type="hidden" id="awsExternalId" name="awsExternalId" />

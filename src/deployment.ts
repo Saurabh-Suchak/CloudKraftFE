@@ -151,7 +151,13 @@ async function runDeploy(workflowState: any, workflowName: string): Promise<void
     const res = await fetch(`${API_BASE}/api/deploy/apply`, {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({ workflow: workflowState, workflow_name: workflowName }),
+      body: JSON.stringify({
+        workflow: workflowState,
+        workflow_name: workflowName,
+        workflow_id: localStorage.getItem('current_workflow_id')
+          ? parseInt(localStorage.getItem('current_workflow_id')!)
+          : undefined,
+      }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: 'Unknown error' }));
