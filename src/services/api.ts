@@ -12,10 +12,15 @@ class ApiService {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
-    const headers: HeadersInit = {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...options.headers,
+      ...(options.headers as Record<string, string>),
     };
+
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
 
     try {
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -46,7 +51,9 @@ class ApiService {
       method: 'POST',
       body: JSON.stringify({ email, password, full_name: fullName }),
     });
-    if (!result.error) document.cookie = 'session_active=1; path=/; SameSite=Lax';
+    if (!result.error && result.data?.access_token) {
+      localStorage.setItem('auth_token', result.data.access_token);
+    }
     return result;
   }
 
@@ -64,7 +71,9 @@ class ApiService {
     }
 
     const data = await response.json();
-    document.cookie = 'session_active=1; path=/; SameSite=Lax';
+    if (data?.access_token) {
+      localStorage.setItem('auth_token', data.access_token);
+    }
     return { data };
   }
 
@@ -75,7 +84,7 @@ class ApiService {
     awsSecretKey: string,
     awsRegion: string
   ) {
-    return this.request<{ access_token: string; token_type: string }>('/api/auth/aws-register', {
+    const result = await this.request<{ access_token: string; token_type: string }>('/api/auth/aws-register', {
       method: 'POST',
       body: JSON.stringify({
         email,
@@ -85,6 +94,10 @@ class ApiService {
         aws_region: awsRegion,
       }),
     });
+    if (!result.error && result.data?.access_token) {
+      localStorage.setItem('auth_token', result.data.access_token);
+    }
+    return result;
   }
 
   async getCurrentUser() {
@@ -120,7 +133,7 @@ class ApiService {
 
   async logout() {
     await fetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST', credentials: 'include' });
-    document.cookie = 'session_active=; path=/; max-age=0; SameSite=Lax';
+    localStorage.removeItem('auth_token');
   }
 
   // Workflows

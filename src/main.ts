@@ -33,7 +33,7 @@ router.addRoute('*', NotFound);
 const PUBLIC_ROUTES = new Set(['/', '/login', '/signup', '/signup-aws']);
 
 function isSessionActive(): boolean {
-  return document.cookie.split(';').some(c => c.trim().startsWith('session_active='));
+  return !!localStorage.getItem('auth_token');
 }
 
 router.setGuard((to: string) => {
