@@ -9,9 +9,8 @@ function stopPolling(): void {
   if (_pollTimer !== null) { clearInterval(_pollTimer); _pollTimer = null; }
 }
 
-function authHeaders(): Record<string, string> {
-  const token = localStorage.getItem('auth_token');
-  return token ? { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' };
+function jsonHeaders(): Record<string, string> {
+  return { 'Content-Type': 'application/json' };
 }
 
 function addLog(logsEl: HTMLElement, message: string, level = 'info'): void {
@@ -58,7 +57,6 @@ export function initDeployment(): void {
 
   const workflowName = localStorage.getItem('deployment_workflow_name') || 'Unnamed Workflow';
   const filesJson    = localStorage.getItem('generated_terraform_files');
-  const token        = localStorage.getItem('auth_token');
 
   let files: TerraformFile[] = [];
   try { if (filesJson) files = JSON.parse(filesJson); } catch { /* ignore */ }
@@ -94,18 +92,6 @@ export function initDeployment(): void {
 
   const logsEl = document.getElementById('deploymentLogs');
   const startBtn = document.getElementById('startDeployBtn') as HTMLButtonElement | null;
-
-  // No auth — block deploy
-  if (!token) {
-    if (logsEl) logsEl.innerHTML = '<div class="log-entry error"><span class="log-message">Not logged in. Please log in first.</span></div>';
-    if (startBtn) startBtn.disabled = true;
-    setStatus('Not authenticated', 'error');
-    document.getElementById('backToCodeBtn')?.addEventListener('click', async () => {
-      const { router } = await import('./router');
-      router.navigate('/login');
-    });
-    return;
-  }
 
   // No canvas state — block deploy
   const canvasStateJson = localStorage.getItem('canvas_state');
@@ -147,7 +133,8 @@ async function runDeploy(workflowState: any, workflowName: string): Promise<void
   try {
     const res = await fetch(`${API_BASE}/api/deploy/apply`, {
       method: 'POST',
-      headers: authHeaders(),
+      headers: jsonHeaders(),
+      credentials: 'include',
       body: JSON.stringify({
         workflow: workflowState,
         workflow_name: workflowName,
@@ -180,7 +167,7 @@ async function runDeploy(workflowState: any, workflowName: string): Promise<void
     try {
       const res = await fetch(
         `${API_BASE}/api/deploy/${deploymentId}/logs?after_id=${lastLogId}`,
-        { headers: authHeaders() }
+        { credentials: 'include' }
       );
       if (!res.ok) return;
       const data: { logs: LogItem[]; deployment_status: string } = await res.json();
@@ -196,7 +183,7 @@ async function runDeploy(workflowState: any, workflowName: string): Promise<void
           setStatus('Succeeded', 'success');
           showDestroyBtn(deploymentId);
           const nodeCount = document.getElementById('summaryNodeCount');
-          const resCountRes = await fetch(`${API_BASE}/api/deploy/${deploymentId}`, { headers: authHeaders() });
+          const resCountRes = await fetch(`${API_BASE}/api/deploy/${deploymentId}`, { credentials: 'include' });
           if (resCountRes.ok) {
             const dep = await resCountRes.json();
             if (dep.resource_count != null && nodeCount) nodeCount.textContent = String(dep.resource_count);
@@ -224,7 +211,7 @@ async function loadExistingDeployment(deploymentId: number): Promise<void> {
   });
 
   try {
-    const res = await fetch(`${API_BASE}/api/deploy/${deploymentId}`, { headers: authHeaders() });
+    const res = await fetch(`${API_BASE}/api/deploy/${deploymentId}`, { credentials: 'include' });
     if (!res.ok) { addLog(logsEl, 'Could not load deployment.', 'error'); return; }
     const dep = await res.json();
 
@@ -242,7 +229,7 @@ async function loadExistingDeployment(deploymentId: number): Promise<void> {
 
     if (!POLL_STATUSES.has(dep.status) && TERMINAL.has(dep.status)) {
       // Load all logs once then stop
-      const logRes = await fetch(`${API_BASE}/api/deploy/${deploymentId}/logs?after_id=0`, { headers: authHeaders() });
+      const logRes = await fetch(`${API_BASE}/api/deploy/${deploymentId}/logs?after_id=0`, { credentials: 'include' });
       if (logRes.ok) {
         logsEl.innerHTML = '';
         const logData: { logs: LogItem[]; deployment_status: string } = await logRes.json();
@@ -258,7 +245,7 @@ async function loadExistingDeployment(deploymentId: number): Promise<void> {
       let lastLogId = 0;
       _pollTimer = setInterval(async () => {
         try {
-          const r = await fetch(`${API_BASE}/api/deploy/${deploymentId}/logs?after_id=${lastLogId}`, { headers: authHeaders() });
+          const r = await fetch(`${API_BASE}/api/deploy/${deploymentId}/logs?after_id=${lastLogId}`, { credentials: 'include' });
           if (!r.ok) return;
           const data: { logs: LogItem[]; deployment_status: string } = await r.json();
           for (const log of data.logs) { addLog(logsEl, log.message, log.level as any); lastLogId = log.id; }
@@ -292,7 +279,7 @@ async function runDestroy(deploymentId: number): Promise<void> {
   try {
     const res = await fetch(`${API_BASE}/api/deploy/${deploymentId}/destroy`, {
       method: 'POST',
-      headers: authHeaders(),
+      credentials: 'include',
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: 'Unknown error' }));
@@ -315,7 +302,7 @@ async function runDestroy(deploymentId: number): Promise<void> {
     try {
       const res = await fetch(
         `${API_BASE}/api/deploy/${deploymentId}/logs?after_id=${lastLogId}`,
-        { headers: authHeaders() }
+        { credentials: 'include' }
       );
       if (!res.ok) return;
       const data: { logs: LogItem[]; deployment_status: string } = await res.json();

@@ -15,9 +15,16 @@ models.Base.metadata.create_all(bind=engine)
 app = FastAPI(title="CloudKraft API")
 
 # Configure CORS for the frontend
+import os as _os
+
+_CORS_ORIGINS = _os.getenv(
+    "CORS_ORIGINS",
+    "http://localhost:5173,http://localhost:5174,http://localhost:3000",
+).split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # In production, restrict to http://localhost:5173 
+    allow_origins=[o.strip() for o in _CORS_ORIGINS],  # F-007: never wildcard
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

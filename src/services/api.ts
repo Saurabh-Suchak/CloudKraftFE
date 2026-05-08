@@ -8,28 +8,20 @@ interface ApiResponse<T> {
 }
 
 class ApiService {
-  private getAuthToken(): string | null {
-    return localStorage.getItem('auth_token');
-  }
-
   private async request<T>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
-    const token = this.getAuthToken();
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
       ...options.headers,
     };
 
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-
     try {
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
         ...options,
         headers,
+        credentials: 'include',
       });
 
       if (!response.ok) {
@@ -50,23 +42,20 @@ class ApiService {
 
   // Authentication
   async register(email: string, password: string, fullName?: string) {
-    return this.request<{ access_token: string; token_type: string }>('/api/auth/register', {
+    const result = await this.request<{ access_token: string; token_type: string }>('/api/auth/register', {
       method: 'POST',
       body: JSON.stringify({ email, password, full_name: fullName }),
     });
+    if (!result.error) document.cookie = 'session_active=1; path=/; SameSite=Lax';
+    return result;
   }
 
   async login(email: string, password: string) {
-    const formData = new FormData();
-    formData.append('username', email);
-    formData.append('password', password);
-
     const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams(formData as any),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ username: email, password }),
+      credentials: 'include',
     });
 
     if (!response.ok) {
@@ -75,9 +64,7 @@ class ApiService {
     }
 
     const data = await response.json();
-    if (data.access_token) {
-      localStorage.setItem('auth_token', data.access_token);
-    }
+    document.cookie = 'session_active=1; path=/; SameSite=Lax';
     return { data };
   }
 
@@ -131,8 +118,9 @@ class ApiService {
     );
   }
 
-  logout() {
-    localStorage.removeItem('auth_token');
+  async logout() {
+    await fetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST', credentials: 'include' });
+    document.cookie = 'session_active=; path=/; max-age=0; SameSite=Lax';
   }
 
   // Workflows
@@ -233,12 +221,28 @@ class ApiService {
     return this.request<any>(`/api/deploy/${id}`);
   }
 
+  // F-012: two-phase plan/approve
+  async planDeployment(workflowId?: number, workflow?: any) {
+    return this.request<any>('/api/deploy/plan', {
+      method: 'POST',
+      body: JSON.stringify({ workflow_id: workflowId, workflow }),
+    });
+  }
+
+  async approveDeployment(id: number) {
+    return this.request<any>(`/api/deploy/${id}/approve`, { method: 'POST' });
+  }
+
   async destroyDeployment(id: number) {
     return this.request<any>(`/api/deploy/${id}/destroy`, { method: 'POST' });
   }
 
   async destroyAllDeployments() {
-    return this.request<{ message: string; count: number }>('/api/deploy/destroy-all', { method: 'POST' });
+    // F-017: backend requires explicit { confirm: true } body to prevent accidental mass-destroy
+    return this.request<{ message: string; count: number }>('/api/deploy/destroy-all', {
+      method: 'POST',
+      body: JSON.stringify({ confirm: true }),
+    });
   }
 
   async getDeploymentLogs(id: number, afterId = 0) {
@@ -253,6 +257,11 @@ class ApiService {
     return this.request<{ connected: boolean; auth_method: string | null; region: string | null; role_arn: string | null; external_id: string | null }>(
       '/api/auth/aws-status'
     );
+  }
+
+  // F-006: fetch platform IAM ARN from server so it is never hardcoded in FE source
+  async getPlatformInfo() {
+    return this.request<{ cloudkraft_iam_arn: string }>('/api/auth/platform-info');
   }
 
   async validateCode(

@@ -148,24 +148,7 @@ export const AWSConnect = (): string => {
                 <div class="info-block" style="background: var(--surface-100); padding: 12px; border-radius: 6px; position: relative;">
                   <p style="margin-bottom: 12px;"><strong>Enable Require external ID with:</strong> <span id="displayExternalId" class="code-span">Generating...</span></p>
                   <p style="margin-bottom: 8px; font-size: 13px;"><strong>Custom Trust Policy:</strong></p>
-                  <pre style="margin: 0; font-family: monospace; font-size: 12px; color: var(--text-600); white-space: pre-wrap; word-break: break-all; background: var(--surface-200); padding: 10px; border-radius: 4px;">
-{
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Effect": "Allow",
-            "Principal": {
-                "AWS": "arn:aws:iam::059801127401:user/cloudkraft"
-            },
-            "Action": "sts:AssumeRole",
-            "Condition": {
-                "StringEquals": {
-                    "sts:ExternalId": "PUT THE EXTERNAL ID"
-                }
-            }
-        }
-    ]
-}</pre>
+                  <pre id="trustPolicyPre" style="margin: 0; font-family: monospace; font-size: 12px; color: var(--text-600); white-space: pre-wrap; word-break: break-all; background: var(--surface-200); padding: 10px; border-radius: 4px;">Loading...</pre>
                 </div>
               </div>
 

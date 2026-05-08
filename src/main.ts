@@ -32,10 +32,14 @@ router.addRoute('*', NotFound);
 
 const PUBLIC_ROUTES = new Set(['/', '/login', '/signup', '/signup-aws']);
 
+function isSessionActive(): boolean {
+  return document.cookie.split(';').some(c => c.trim().startsWith('session_active='));
+}
+
 router.setGuard((to: string) => {
-  const token = localStorage.getItem('auth_token');
-  if (!token && !PUBLIC_ROUTES.has(to)) return '/login';
-  if (token && (to === '/' || to === '/login')) return '/dashboard';
+  const active = isSessionActive();
+  if (!active && !PUBLIC_ROUTES.has(to)) return '/login';
+  if (active && (to === '/' || to === '/login')) return '/dashboard';
   return null;
 });
 
@@ -455,10 +459,10 @@ setInterval(() => {
 
 // ─── Logout ───────────────────────────────────────────────────────────────────
 
-document.addEventListener('click', (e) => {
+document.addEventListener('click', async (e) => {
   const target = e.target as HTMLElement;
   if (target.closest('#logoutBtn')) {
-    apiService.logout();
+    await apiService.logout();
     localStorage.removeItem('current_user');
     localStorage.removeItem('canvas_state');
     localStorage.removeItem('current_workflow_id');
@@ -744,6 +748,27 @@ async function initAWSConnect(): Promise<void> {
     if (extIdHidden)  extIdHidden.value = status.data.external_id;
   }
 
+  // F-006: fetch IAM ARN from API instead of hardcoding it in source
+  const trustPolicyPre = document.getElementById('trustPolicyPre');
+  if (trustPolicyPre) {
+    const externalId = status.data?.external_id ?? 'PUT_THE_EXTERNAL_ID_HERE';
+    try {
+      const platformInfo = await apiService.getPlatformInfo();
+      const arn = platformInfo.data?.cloudkraft_iam_arn ?? 'arn:aws:iam::REPLACE_ACCOUNT_ID:user/cloudkraft';
+      trustPolicyPre.textContent = JSON.stringify({
+        Version: '2012-10-17',
+        Statement: [{
+          Effect: 'Allow',
+          Principal: { AWS: arn },
+          Action: 'sts:AssumeRole',
+          Condition: { StringEquals: { 'sts:ExternalId': externalId } },
+        }],
+      }, null, 4);
+    } catch {
+      trustPolicyPre.textContent = 'Could not load trust policy — please refresh.';
+    }
+  }
+
   const disconnectSection = document.getElementById('awsDisconnectSection');
   const disconnectBtn     = document.getElementById('awsDisconnectBtn') as HTMLButtonElement | null;
 
@@ -788,13 +813,6 @@ async function initAWSConnect(): Promise<void> {
 
 const API_BASE_DEPLOY = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
-function deplAuthHeaders(): Record<string, string> {
-  const token = localStorage.getItem('auth_token');
-  return token
-    ? { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
-    : { 'Content-Type': 'application/json' };
-}
-
 function deplStatusClass(status: string): string {
   if (status === 'succeeded') return 'success';
   if (status === 'failed') return 'error';
@@ -808,14 +826,9 @@ async function initDeploymentsList(): Promise<void> {
 
   const render = async () => {
     container.innerHTML = '<div class="deployments-loading">Loading deployments...</div>';
-    const token = localStorage.getItem('auth_token');
-    if (!token) {
-      container.innerHTML = '<div class="deployments-empty">Not logged in.</div>';
-      return;
-    }
 
     try {
-      const res = await fetch(`${API_BASE_DEPLOY}/api/deploy/`, { headers: deplAuthHeaders() });
+      const res = await fetch(`${API_BASE_DEPLOY}/api/deploy/`, { credentials: 'include' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const deployments: any[] = await res.json();
 
@@ -890,7 +903,7 @@ async function initDeploymentsList(): Promise<void> {
       try {
         const res = await fetch(`${API_BASE_DEPLOY}/api/deploy/${id}/destroy`, {
           method: 'POST',
-          headers: deplAuthHeaders(),
+          credentials: 'include',
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({ detail: 'Unknown error' }));
