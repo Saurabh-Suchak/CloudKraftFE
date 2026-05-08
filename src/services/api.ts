@@ -132,7 +132,7 @@ class ApiService {
   }
 
   async logout() {
-    await fetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST', credentials: 'include' });
+    await this.request('/api/auth/logout', { method: 'POST' });
     localStorage.removeItem('auth_token');
   }
 
