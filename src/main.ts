@@ -9,9 +9,10 @@ import { DeploymentStatus } from './pages/DeploymentStatus';
 import { AWSConnect } from './pages/AWSConnect';
 import { DeploymentsList } from './pages/DeploymentsList';
 import { Profile } from './pages/Profile';
+import { Docs } from './pages/Docs';
 import { NotFound } from './pages/NotFound';
 import './styles/main.css';
-import { reinitWorkflowDesigner, resetWorkflowDesignerInit, loadWorkflowState } from './workflow';
+import { reinitWorkflowDesigner, resetWorkflowDesignerInit, loadWorkflowState, applyTemplateById } from './workflow';
 import { initDeployment } from './deployment';
 import { apiService } from './services/api';
 import { initCodeViewer } from './codeviewer';
@@ -28,6 +29,7 @@ router.addRoute('/deployment', DeploymentStatus);
 router.addRoute('/aws-connect', AWSConnect);
 router.addRoute('/deployments', DeploymentsList);
 router.addRoute('/profile', Profile);
+router.addRoute('/docs', Docs);
 router.addRoute('*', NotFound);
 
 const PUBLIC_ROUTES = new Set(['/', '/login', '/signup', '/signup-aws']);
@@ -296,6 +298,7 @@ function onRouteChange(): void {
 
     // Opening a saved workflow from the dashboard takes priority
     const pendingJson = localStorage.getItem('pending_workflow');
+    const pendingTemplate = localStorage.getItem('pending_template');
     if (pendingJson) {
       localStorage.removeItem('pending_workflow');
       try {
@@ -307,6 +310,9 @@ function onRouteChange(): void {
           }, 200);
         }
       } catch { /* ignore malformed data */ }
+    } else if (pendingTemplate) {
+      localStorage.removeItem('pending_template');
+      setTimeout(() => { applyTemplateById(pendingTemplate); }, 200);
     } else {
       const canvasJson = localStorage.getItem('canvas_state');
       const hasCanvas = (() => {
