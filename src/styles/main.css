@@ -2927,3 +2927,12 @@ body {
   border-color: #dc2626;
   color: #dc2626;
 }
+
+.doc-picker-link {
+  color: var(--primary, #2563eb);
+  text-decoration: none;
+  font-weight: 500;
+}
+.doc-picker-link:hover {
+  text-decoration: underline;
+}

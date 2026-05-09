@@ -1736,6 +1736,13 @@ const TEMPLATES: Template[] = [
   },
 ];
 
+export function applyTemplateById(id: string): boolean {
+  const template = TEMPLATES.find(t => t.id === id);
+  if (!template) return false;
+  loadWorkflowState(template.state);
+  return true;
+}
+
 function setupTemplates(): void {
   const btn = document.getElementById('templatesBtn');
   const modal = document.getElementById('templatesModal');
