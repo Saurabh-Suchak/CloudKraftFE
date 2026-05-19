@@ -4,7 +4,9 @@
   "scripts": {
     "dev": "vite",
     "lint": "eslint .",
-    "test": "echo \"No tests yet\" && exit 0",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "build": "vite build"
   },
   "devDependencies": {
@@ -12,15 +14,19 @@
     "@types/node": "^24.10.1",
     "@typescript-eslint/eslint-plugin": "^8.48.1",
     "@typescript-eslint/parser": "^8.48.1",
+    "@vitest/coverage-v8": "^4.1.6",
     "eslint": "^9.39.1",
     "globals": "^16.5.0",
+    "jsdom": "^27.0.1",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.48.1",
-    "vite": "^7.2.6"
+    "vite": "^7.2.6",
+    "vitest": "^3.2.4"
   },
   "dependencies": {
     "@monaco-editor/loader": "^1.7.0",
     "aws-icons": "^3.3.0",
-    "html2canvas": "^1.4.1"
+    "html2canvas": "^1.4.1",
+    "motion": "^12.39.0"
   }
 }

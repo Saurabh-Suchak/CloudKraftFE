@@ -10,7 +10,9 @@ import { AWSConnect } from './pages/AWSConnect';
 import { DeploymentsList } from './pages/DeploymentsList';
 import { Profile } from './pages/Profile';
 import { Docs } from './pages/Docs';
+import { Chat } from './pages/Chat';
 import { NotFound } from './pages/NotFound';
+import { initChat } from './chat';
 import './styles/main.css';
 import { reinitWorkflowDesigner, resetWorkflowDesignerInit, loadWorkflowState, applyTemplateById } from './workflow';
 import { initDeployment } from './deployment';
@@ -30,6 +32,7 @@ router.addRoute('/aws-connect', AWSConnect);
 router.addRoute('/deployments', DeploymentsList);
 router.addRoute('/profile', Profile);
 router.addRoute('/docs', Docs);
+router.addRoute('/chat', Chat);
 router.addRoute('*', NotFound);
 
 const PUBLIC_ROUTES = new Set(['/', '/login', '/signup', '/signup-aws']);
@@ -400,6 +403,10 @@ function onRouteChange(): void {
   if (document.querySelector('.profile-main')) {
     profileInitialized = true;
     initProfile();
+  }
+
+  if (document.getElementById('chatSessionsList')) {
+    initChat();
   }
 }
 

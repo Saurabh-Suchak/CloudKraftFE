@@ -1,6 +1,6 @@
 // API service for backend communication
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
 
 interface ApiResponse<T> {
   data?: T;
@@ -328,6 +328,30 @@ class ApiService {
       method: 'POST',
       body: JSON.stringify({ terraform_code: terraformCode, files: files ?? [] }),
     });
+  }
+
+  // ── Chat ────────────────────────────────────────────────────────────────────
+
+  async chatCreateSession(provider: string, model?: string) {
+    return this.request<{
+      id: number; title: string | null; llm_provider: string;
+      llm_model: string | null; created_at: string;
+    }>('/api/chat/sessions', {
+      method: 'POST',
+      body: JSON.stringify({ llm_provider: provider, llm_model: model ?? null }),
+    });
+  }
+
+  async chatListSessions() {
+    return this.request<any[]>('/api/chat/sessions');
+  }
+
+  async chatGetSession(sessionId: number) {
+    return this.request<{ session: any; messages: any[] }>(`/api/chat/sessions/${sessionId}`);
+  }
+
+  async chatDeleteSession(sessionId: number) {
+    return this.request(`/api/chat/sessions/${sessionId}`, { method: 'DELETE' });
   }
 }
 

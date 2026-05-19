@@ -10,3 +10,10 @@ backend/*.db
 backend/**/.env
 
 /.env
+
+# Claude Code local config (may contain API keys)
+.claude/
+.mcp.json
+
+# Planning / scratch docs
+feature_*.md
