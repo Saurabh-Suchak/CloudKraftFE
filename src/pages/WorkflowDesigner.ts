@@ -253,6 +253,7 @@ export const WorkflowDesigner = (): string => {
             <button class="btn btn-outline" id="clearCanvasBtn">Clear</button>
             <button class="btn btn-outline" id="saveBtn">Save</button>
             <button class="btn btn-primary" id="deployBtn">Deploy</button>
+            <button class="btn btn-outline" id="agentPanelBtn">AI Agent</button>
           <!-- AI Generate modal -->
     <div class="modal-overlay" id="aiModal" style="display:none">
       <div class="modal-box" style="max-width:560px">
@@ -1410,6 +1411,96 @@ export const WorkflowDesigner = (): string => {
               Delete Resource
             </button>
           </aside>
+          <div class="agent-panel" id="agent-panel"
+               style="width:0;overflow:hidden;opacity:0"
+               aria-label="AI Agent panel"
+               role="complementary">
+            <div class="agent-panel-header">
+              <div class="agent-panel-title-row">
+                <span class="agent-panel-title">AI Agent</span>
+                <div class="agent-mode-toggle" id="agentModeToggle">
+                  <button class="agent-mode-btn agent-mode-btn--active" id="agentModeChat">Chat</button>
+                  <button class="agent-mode-btn" id="agentModeEdit">Edit</button>
+                </div>
+                <div class="agent-panel-header-actions">
+                  <div class="agent-tooltip-wrap">
+                    <button class="agent-icon-btn" id="agentHistoryBtn" aria-label="Conversation history">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                      </svg>
+                    </button>
+                    <span class="agent-tooltip" role="tooltip">History</span>
+                  </div>
+                  <div class="agent-tooltip-wrap">
+                    <button class="agent-icon-btn" id="agentCloseBtn" aria-label="Close AI Agent panel">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                      </svg>
+                    </button>
+                    <span class="agent-tooltip" role="tooltip">Close</span>
+                  </div>
+                </div>
+              </div>
+              <div class="agent-session-popover" id="agentSessionPopover"
+                   style="display:none" role="dialog" aria-label="Conversation history">
+                <button class="agent-session-new-item" id="agentNewConversationBtn">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  </svg>
+                  New conversation
+                </button>
+                <div class="agent-session-popover-divider"></div>
+                <div class="agent-session-popover-list" id="agentSessionPopoverList"></div>
+              </div>
+            </div>
+            <div class="chat-messages agent-messages" id="agent-chatMessages" style="display:none"></div>
+            <div class="agent-chips-state" id="agentChipsState" style="display:none">
+              <p class="agent-chips-hint">Try a template or describe your own:</p>
+              <div class="agent-generate-chips">
+                <button class="agent-chip" data-prompt="A 3-tier web app with VPC, public subnet, EC2, RDS MySQL and an Application Load Balancer">3-Tier Web App</button>
+                <button class="agent-chip" data-prompt="A serverless API with Lambda, DynamoDB, API Gateway and an IAM role">Serverless API</button>
+                <button class="agent-chip" data-prompt="A static website on S3 with CloudFront CDN and an IAM role">Static CDN</button>
+                <button class="agent-chip" data-prompt="A secure VPC with public and private subnets, internet gateway, NAT gateway and a bastion EC2">Secure VPC</button>
+              </div>
+            </div>
+            <div class="agent-new-session-form" id="agent-newSessionForm" style="display:none">
+              <p class="agent-form-hint">New conversation</p>
+              <label class="agent-form-label" for="agentProviderSelect">Provider</label>
+              <select id="agentProviderSelect" class="form-input agent-form-compact">
+                <option value="claude">Claude (Anthropic)</option>
+                <option value="openai">GPT (OpenAI)</option>
+                <option value="gemini">Gemini (Google)</option>
+              </select>
+              <label class="agent-form-label" for="agentModelInput">
+                Model <span class="label-hint">(optional)</span>
+              </label>
+              <input id="agentModelInput" type="text"
+                     class="form-input agent-form-compact"
+                     placeholder="e.g. claude-sonnet-4-6"/>
+              <div class="agent-form-actions">
+                <button class="btn btn-primary btn-sm" id="agentCreateSessionBtn">Create</button>
+                <button class="btn btn-outline btn-sm" id="agentCancelNewSessionBtn">Cancel</button>
+              </div>
+            </div>
+            <div class="agent-input-area">
+              <div class="chat-input-wrapper">
+                <textarea
+                  id="agent-chatInput"
+                  class="chat-textarea"
+                  placeholder="Describe your AWS infrastructure… (e.g. 'A 3-tier web app with VPC, EC2, RDS, and an ALB')"
+                  rows="4"
+                ></textarea>
+                <button class="chat-send-btn" id="agent-chatSendBtn" disabled>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13"
+                          stroke="currentColor" stroke-width="2"
+                          stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </button>
+              </div>
+              <div class="chat-status" id="agent-chatStatus"></div>
+            </div>
+          </div>
         <!-- AI Generate modal -->
     <div class="modal-overlay" id="aiModal" style="display:none">
       <div class="modal-box" style="max-width:560px">

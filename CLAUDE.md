@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npm run dev      # Vite dev server on :5173
 npm run build    # Production build
 npm run lint     # ESLint with TypeScript rules
-npm test         # Placeholder — no tests yet
+npm test         # Vitest (jsdom); tests in src/__tests__/
 ```
 
 Set `VITE_API_URL` to point at a different backend (defaults to `http://localhost:8001`). Production points to `https://cloudkraftbe.onrender.com` via `.env.production`.

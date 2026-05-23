@@ -1254,9 +1254,12 @@ export function getWorkflowState(): any {
     });
   });
 
+  const liveNodeIds = new Set(nodes.map((n: any) => n.id));
   return {
     nodes: nodes,
-    connections: connections.map(c => ({ ...c })),
+    connections: connections
+      .filter(c => liveNodeIds.has(c.fromNodeId) && liveNodeIds.has(c.toNodeId))
+      .map(c => ({ ...c })),
     metadata: {
       created_at: new Date().toISOString(),
     },

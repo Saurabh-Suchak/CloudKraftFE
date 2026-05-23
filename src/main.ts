@@ -12,9 +12,10 @@ import { Profile } from './pages/Profile';
 import { Docs } from './pages/Docs';
 import { Chat } from './pages/Chat';
 import { NotFound } from './pages/NotFound';
-import { initChat } from './chat';
+import { initChat, initAgentPanel, destroyAgentPanel, reducedMotion } from './chat';
+import { animate } from 'motion';
 import './styles/main.css';
-import { reinitWorkflowDesigner, resetWorkflowDesignerInit, loadWorkflowState, applyTemplateById } from './workflow';
+import { reinitWorkflowDesigner, resetWorkflowDesignerInit, loadWorkflowState, applyTemplateById, getWorkflowState } from './workflow';
 import { initDeployment } from './deployment';
 import { apiService } from './services/api';
 import { initCodeViewer } from './codeviewer';
@@ -88,6 +89,8 @@ let codeViewerInitialized = false;
 let deploymentInitialized = false;
 let profileInitialized = false;
 let workflowsCache: any[] = [];
+let agentPanelOpen = false;
+let _agentApplyHandler: ((e: Event) => void) | null = null;
 
 function formatRelativeDate(dateStr: string): string {
   if (!dateStr) return '—';
@@ -284,11 +287,95 @@ async function initDashboard(): Promise<void> {
   }
 }
 
+// ─── Agent panel toggle ───────────────────────────────────────────────────────
+
+function wireAgentPanel(): void {
+  const btn = document.getElementById('agentPanelBtn');
+  if (!btn || btn.hasAttribute('data-agent-wired')) return;
+  btn.setAttribute('data-agent-wired', 'true');
+
+  // ── Mode toggle ──
+  let agentEditMode = false;
+
+  const setEditMode = (isEdit: boolean) => {
+    agentEditMode = isEdit;
+    document.getElementById('agentModeChat')
+      ?.classList.toggle('agent-mode-btn--active', !isEdit);
+    document.getElementById('agentModeEdit')
+      ?.classList.toggle('agent-mode-btn--active', isEdit);
+  };
+
+  document.getElementById('agentModeChat')?.addEventListener('click', () => setEditMode(false));
+  document.getElementById('agentModeEdit')?.addEventListener('click', () => setEditMode(true));
+
+  // ── Chip clicks: force Edit mode + send immediately ──
+  const chipInput  = document.getElementById('agent-chatInput') as HTMLTextAreaElement | null;
+  const chipSendBtn = document.getElementById('agent-chatSendBtn');
+  document.getElementById('agentChipsState')?.addEventListener('click', (e) => {
+    const chip = (e.target as HTMLElement).closest<HTMLElement>('.agent-chip');
+    if (!chip) return;
+    const prompt = chip.dataset.prompt || '';
+    setEditMode(true);
+    if (chipInput) {
+      chipInput.value = prompt;
+      chipInput.dispatchEvent(new Event('input'));
+    }
+    chipSendBtn?.click();
+  });
+
+  // ── Apply workflow proposal (dispatched by ChatManager) ──
+  if (_agentApplyHandler) document.removeEventListener('agent:apply-workflow', _agentApplyHandler);
+  _agentApplyHandler = (e: Event) => {
+    const state = (e as CustomEvent<any>).detail;
+    if (state) loadWorkflowState(state);
+  };
+  document.addEventListener('agent:apply-workflow', _agentApplyHandler);
+
+  const openPanel = () => {
+    const panel = document.getElementById('agent-panel') as HTMLElement | null;
+    if (!panel) return;
+    agentPanelOpen = true;
+    btn.classList.add('agent-panel-btn--active');
+    panel.style.overflow = 'hidden';
+    if (!reducedMotion()) {
+      animate(panel, { width: ['0px', '340px'], opacity: [0, 1] }, { duration: 0.22, easing: 'ease-out' });
+      animate(btn, { scale: [1, 0.96, 1] }, { duration: 0.15, easing: [0.34, 1.56, 0.64, 1] as unknown as string });
+    } else {
+      panel.style.width = '340px';
+      panel.style.opacity = '1';
+    }
+    initAgentPanel({
+      getEditMode:    () => agentEditMode,
+      getCanvasState: () => getWorkflowState(),
+    });
+  };
+
+  const closePanel = () => {
+    const panel = document.getElementById('agent-panel') as HTMLElement | null;
+    if (!panel) return;
+    agentPanelOpen = false;
+    btn.classList.remove('agent-panel-btn--active');
+    destroyAgentPanel();
+    if (!reducedMotion()) {
+      animate(panel, { width: ['340px', '0px'], opacity: [1, 0] }, { duration: 0.18, easing: 'ease-in' })
+        .then(() => { panel.style.width = '0'; panel.style.opacity = '0'; });
+    } else {
+      panel.style.width = '0';
+      panel.style.opacity = '0';
+    }
+  };
+
+  btn.addEventListener('click', () => { if (agentPanelOpen) closePanel(); else openPanel(); });
+  document.getElementById('agentCloseBtn')?.addEventListener('click', closePanel);
+}
+
 // ─── MutationObserver — re-init features after each route render ──────────────
 
 // Observe only direct children of #app — fires once per route render, not on
 // every text/attribute change inside the page (which caused infinite loops).
 function onRouteChange(): void {
+  destroyAgentPanel();
+  agentPanelOpen = false;
   updateUserDisplay();
   resetWorkflowDesignerInit();
   dashboardInitialized = false;
@@ -298,6 +385,7 @@ function onRouteChange(): void {
 
   if (document.getElementById('workflowCanvas')) {
     reinitWorkflowDesigner();
+    wireAgentPanel();
 
     // Opening a saved workflow from the dashboard takes priority
     const pendingJson = localStorage.getItem('pending_workflow');
@@ -328,6 +416,15 @@ function onRouteChange(): void {
           const name = `Workflow ${count}`;
           localStorage.setItem('current_workflow_name', name);
           setDesignerTitle(name);
+
+          // Auto-persist so current_workflow_id is always available before AI Agent opens
+          if (!localStorage.getItem('current_workflow_id')) {
+            apiService.createWorkflow(name, '', { nodes: [], connections: [] }).then(res => {
+              if (res.data?.id) {
+                localStorage.setItem('current_workflow_id', String(res.data.id));
+              }
+            });
+          }
         });
       };
 
